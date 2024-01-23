@@ -1,7 +1,8 @@
 # booru-classifier
-Downloaded tagged images from any booru with similar structure to [safebooru](https://safebooru.org/).
+Download tagged images from any booru with similar structure to [safebooru](https://safebooru.org/).
 
 # howto
+- install requirements with ```pip install -r requirements.txt```
 - fill in common parameters in ```parameters.py``` (some ```*.py``` files also have inputs at the top)
 - run ```scrape_tags_async.py``` to scrape all tags from the booru.
 - run ```scrape_posts_async.py``` to scrape the first ~2000 pages of posts for each tag (if applicable).
