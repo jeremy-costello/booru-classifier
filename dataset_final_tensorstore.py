@@ -9,7 +9,7 @@ import pyspark.sql.functions as F
 from pyspark.sql import SparkSession
 from PIL import Image, UnidentifiedImageError
 
-from parameters import parameter_dict
+from parameters import build_parameter_dict
 
 
 # still testing this. lock-file error with tensorstore
@@ -18,14 +18,13 @@ CHANNEL_SIZE = 3
 CHUNKS = 10
 
 
-large_file_root = parameter_dict["large_file_root"]
-image_save_root = f"{large_file_root}/images"
+parameter_dict = build_parameter_dict()
+
+image_save_root = parameter_dict["image_save_root"]
 tag_indices_file = parameter_dict["tag_indices_json"]
 skeleton_parquet = parameter_dict["skeleton_parquet_file"]
 image_tensorstore_file = parameter_dict["image_tensorstore_file"]
-image_tensorstore = f"{large_file_root}/{image_tensorstore_file}"
 tags_tensorstore_file = parameter_dict["tags_tensorstore_file"]
-tags_tensorstore = f"{large_file_root}/{tags_tensorstore_file}"
 
 with open(tag_indices_file, 'r') as f:
     tag_indices = json.load(f)
@@ -99,7 +98,7 @@ image_dataset = ts.open({
     "driver": "zarr",
     "kvstore": {
         "driver": "file",
-        "path": image_tensorstore
+        "path": image_tensorstore_file
     },
     "metadata": {
         "compressor": {
@@ -117,7 +116,7 @@ tags_dataset = ts.open({
     "driver": "zarr",
     "kvstore": {
         "driver": "file",
-        "path": tags_tensorstore
+        "path": tags_tensorstore_file
     },
     "metadata": {
         "compression": {

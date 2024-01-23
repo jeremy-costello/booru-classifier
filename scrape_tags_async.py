@@ -6,11 +6,13 @@ import itertools
 from bs4 import BeautifulSoup
 from tqdm.asyncio import tqdm, tqdm_asyncio
 
-from parameters import parameter_dict
+from parameters import build_parameter_dict
 
 
 MAX_RETRIES = 10
 
+
+parameter_dict = build_parameter_dict()
 
 booru_url = parameter_dict["booru_url"]
 database_file = parameter_dict["database_file"]

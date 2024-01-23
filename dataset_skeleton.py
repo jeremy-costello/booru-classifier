@@ -6,7 +6,7 @@ import sqlite3
 from tqdm import tqdm
 from pyspark.sql import SparkSession, Row
 
-from parameters import parameter_dict
+from parameters import build_parameter_dict
 
 
 CHUNKS = 32
@@ -38,6 +38,8 @@ IGNORE_TAGS = [
     "webm"
 ]
 
+
+parameter_dict = build_parameter_dict()
 
 database_file = parameter_dict["database_file"]
 tag_indices_file = parameter_dict["tag_indices_json"]

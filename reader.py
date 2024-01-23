@@ -10,13 +10,13 @@ from pyspark.sql import SparkSession
 import torchvision.transforms.v2 as transforms
 from torch.utils.data import Dataset, DataLoader
 
-from parameters import parameter_dict
+from parameters import build_parameter_dict
 
 
 def main():
-    large_file_root = parameter_dict["large_file_root"]
+    parameter_dict = build_parameter_dict()
+
     train_parquet_file = parameter_dict["train_parquet_file"]
-    train_parquet = f"{large_file_root}/{train_parquet_file}"
     dataset_statistics_file = parameter_dict["dataset_statistics_json"]
 
     with open(dataset_statistics_file, 'r') as f:
@@ -31,7 +31,7 @@ def main():
         transforms.Normalize(mean=dataset_statistics["mean"], std=dataset_statistics["std"]),
     ])
 
-    dataset = ParquetDataset(train_parquet, transform)
+    dataset = ParquetDataset(train_parquet_file, transform)
 
     loader = DataLoader(
         dataset,

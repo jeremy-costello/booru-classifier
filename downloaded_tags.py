@@ -2,11 +2,13 @@ import math
 import sqlite3
 from tqdm import tqdm
 
-from parameters import parameter_dict
+from parameters import build_parameter_dict
 
 
 BATCH_SIZE = 512
 
+
+parameter_dict = build_parameter_dict()
 
 database_file = parameter_dict["database_file"]
 

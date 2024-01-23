@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 from tqdm.asyncio import tqdm, tqdm_asyncio
 
-from parameters import parameter_dict
+from parameters import build_parameter_dict
 
 
 YEAR_CUTOFF = 2024
@@ -23,6 +23,7 @@ MAP_DICT = {
     "false": False
 }
 
+parameter_dict = build_parameter_dict()
 
 booru_url = parameter_dict["booru_url"]
 database_file = parameter_dict["database_file"]
@@ -110,10 +111,13 @@ async def get_xml_tree(tag, page, session):
             pass
         except aiohttp.client_exceptions.ClientOSError:
             pass
+        except aiohttp.client_exceptions.ClientPayloadError:
+            pass
         except asyncio.TimeoutError:
             pass
         if retry >= MAX_RETRIES:
             raise TimeoutError("Max retries exceeded.")
+
 
 async def get_posts_from_tag_page(tag, page, post_id_set, session):
     xml_tree = await get_xml_tree(tag, page, session)

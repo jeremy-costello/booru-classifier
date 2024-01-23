@@ -8,7 +8,7 @@ import itertools
 from pathlib import Path
 from tqdm.asyncio import tqdm, tqdm_asyncio
 
-from parameters import parameter_dict
+from parameters import build_parameter_dict
 
 
 GOOD_EXTENSIONS = ["jpeg", "jpg", "png"]
@@ -16,9 +16,10 @@ BATCH_SIZE = 8192
 MAX_RETRIES = 10
 
 
+parameter_dict = build_parameter_dict()
+
 database_file = parameter_dict["database_file"]
-large_file_root = parameter_dict["large_file_root"]
-image_save_root = f"{large_file_root}/images"
+image_save_root = parameter_dict["image_save_root"]
 
 
 def create_tables(cursor):
