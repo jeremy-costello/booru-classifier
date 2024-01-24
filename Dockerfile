@@ -22,6 +22,8 @@ RUN poetry install
 
 RUN apk del installer
 
+RUN apk add openjdk8
+
 COPY *.py ./
 
 ENTRYPOINT ["/bin/sh"]

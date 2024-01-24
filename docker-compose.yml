@@ -1,0 +1,13 @@
+version: '3'
+services:
+  booru-classifier:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - booru-data:/booru-classifier/data  # Adjust the path as needed# docker-compose.yml
+    tty: true
+    stdin_open: true
+
+volumes:
+  booru-data:
