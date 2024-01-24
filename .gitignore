@@ -162,4 +162,7 @@ cython_debug/
 # CUSTOM
 data/
 !data/.gitkeep
+bazel/
 final_processing.py
+*.ipynb
+*.txt

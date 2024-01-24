@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "booru-classifier"
+version = "0.1.0"
+description = "Download tagged images from boorus."
+authors = ["Your Name <you@example.com>"]
+license = "GNU GPL-3.0"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+aiofiles = "^23.2.1"
+aiohttp = "^3.9.1"
+beautifulsoup4 = "^4.12.3"
+numpy = "^1.26.3"
+pillow = "^10.2.0"
+pyspark = "^3.5.0"
+tensorstore = { path = "./tensorstore-0.1.52-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl" }
+tqdm = "^4.66.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

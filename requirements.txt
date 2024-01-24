@@ -1,8 +1,0 @@
-aiofiles
-aiohttp
-beautifulsoup4
-numpy
-pillow
-pyspark
-tensorstore
-tqdm

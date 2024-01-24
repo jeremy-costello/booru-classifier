@@ -1,6 +1,6 @@
 PARAMETER_DICT = {
     "booru_url": "https://safebooru.org",
-    "large_file_root": None,  # must be an absolute file path
+    "large_file_root": "./data",
     "large_files": {
         "database_file": "safebooru.db",
         "image_save_root": "images",
@@ -27,7 +27,7 @@ def build_parameter_dict():
     for file_type in ["large_file", "small_file"]:
         root = PARAMETER_DICT[f"{file_type}_root"]
 
-        for key, value in PARAMETER_DICT[f"{file_type}s"]:
+        for key, value in PARAMETER_DICT[f"{file_type}s"].items():
             parameter_dict[key] = f"{root}/{value}"
     
     return parameter_dict
