@@ -198,7 +198,7 @@ async def get_all_posts():
 
     tag_list = []
     page_list = []
-    for tag in tqdm(full_tag_list):
+    for it, tag in tqdm(enumerate(full_tag_list)):
         cursor.execute("SELECT EXISTS (SELECT 1 FROM completed_tags WHERE tag_name = ?)", (tag,))
         tag_completed = cursor.fetchone()[0]
         if not tag_completed:
@@ -210,7 +210,7 @@ async def get_all_posts():
             page_list.extend(list(range(total_pages)))
 
             assert len(tag_list) == len(page_list)
-            if len(tag_list) >= MIN_BATCH_SIZE:
+            if (len(tag_list) >= MIN_BATCH_SIZE) or (it == (len(full_tag_list) - 1)):
                 cursor.execute("SELECT id FROM posts")
                 post_id_set = set([row[0] for row in cursor.fetchall()])
                 

@@ -4,12 +4,12 @@ import math
 import random
 import sqlite3
 from tqdm import tqdm
-from pyspark.sql import SparkSession, Row
+import dask.dataframe as dd
 
 from parameters import build_parameter_dict
 
 
-CHUNKS = 32
+PARTITIONS = 32
 MIN_COUNT = 50
 COUNT_LIMIT = 5000
 LIMITED_TYPES = ["artist", "copyright", "model"]
@@ -152,29 +152,17 @@ tag_counts = {key: value for key, value in
 with open(tag_counts_file, "w") as f:
     json.dump(tag_counts, f, indent=4)
 
-# pyspark dataframe of dataset_dict
-spark = SparkSession.builder.appName("dataset_skeleton").getOrCreate()
+dictionary_list = [{'id': key, **values} for key, values in dataset_dict.items()]
 
-dataset_size = len(dataset_dict)
-chunk_size = math.ceil(dataset_size / CHUNKS)
-
-dataframes = []
-for chunk in range(CHUNKS):
-    chunked_dataset = list(dataset_dict.items())[chunk * chunk_size : (chunk + 1) * chunk_size]
-    rows = [Row(id=key, **values) for key, values in chunked_dataset]
-    dataframes.append(spark.createDataFrame(rows))
-
-concatenated_df = dataframes[0]
-for df in dataframes[1:]:
-    concatenated_df = concatenated_df.union(df)
+ddf = dd.from_pandas(dictionary_list, npartitions=PARTITIONS)
 
 skeleton_url = skeleton_parquet.lstrip(".").strip("/")
 full_skeleton_url = f"file://{os.getcwd()}/{skeleton_url}"
-concatenated_df.write.parquet(full_skeleton_url, mode="overwrite")
+ddf.to_parquet(full_skeleton_url, write_options={'compression': 'snappy'}).compute()
 
 # input: id -> image array || output: tag strings -> n-hot tags
 print(len(dataset_dict))
-print(concatenated_df.count())
+print(len(ddf))
 
 # tag -> index || index -> tag
 print(tag_indices["vocab_size"])
