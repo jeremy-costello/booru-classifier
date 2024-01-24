@@ -4,7 +4,8 @@ Download tagged images from any booru with similar structure to [safebooru](http
 # howto
 - fill in common parameters in ```parameters.py``` (some ```*.py``` files also have inputs at the top)
 - run the docker compose with ```docker-compose up``` (may need sudo)
-- attach to the docker compose with ```docker-compose exec booru-classifier /bin/sh```
+- attach to the docker compose with ```docker-compose exec booru-classifier /bin/sh``` (may need sudo)
+- activate the poetry environemtn with ```poetry shell```
 - run ```scrape_tags_async.py``` to scrape all tags from the booru.
 - run ```scrape_posts_async.py``` to scrape the first ~2000 pages of posts for each tag (if applicable).
 - run ```scrape_images_async.py``` to scrape images from posts.
