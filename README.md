@@ -18,3 +18,4 @@ Download tagged images from any booru with similar structure to [safebooru](http
 - update pytorch dataset
 - finish training code
 - train a model
+- use something besides pyspark so the Docker container doesn't need Java
