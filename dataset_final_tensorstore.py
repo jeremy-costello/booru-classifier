@@ -1,12 +1,12 @@
 import os
 import json
-import math
+import sqlite3
 import numpy as np
+import pandas as pd
+from tqdm import tqdm
 from io import BytesIO
 import tensorstore as ts
-import pyspark.sql.types as T
-import pyspark.sql.functions as F
-from pyspark.sql import SparkSession
+import dask.dataframe as dd
 from PIL import Image, UnidentifiedImageError
 
 from parameters import build_parameter_dict
@@ -20,11 +20,22 @@ CHUNKS = 10
 
 parameter_dict = build_parameter_dict()
 
+database_file = parameter_dict["database_file"]
 image_save_root = parameter_dict["image_save_root"]
 tag_indices_file = parameter_dict["tag_indices_json"]
 skeleton_parquet = parameter_dict["skeleton_parquet_file"]
 image_tensorstore_file = parameter_dict["image_tensorstore_file"]
 tags_tensorstore_file = parameter_dict["tags_tensorstore_file"]
+
+conn = sqlite3.connect(database_file)
+cursor = conn.cursor()
+
+cursor.execute("SELECT tag_splitter FROM meta_info")
+tag_splitter_tuple = cursor.fetchall()[0]
+assert len(tag_splitter_tuple) == 1
+tag_splitter = tag_splitter_tuple[0]
+
+conn.close()
 
 with open(tag_indices_file, 'r') as f:
     tag_indices = json.load(f)
@@ -32,27 +43,34 @@ with open(tag_indices_file, 'r') as f:
 vocab_size = tag_indices["vocab_size"]
 
 
-def image_and_tags(id_, tags, file_extension):
+def image_and_tags(id_, tags, file_extension):   
     image_path = f"{image_save_root}/{id_}.{file_extension}"
     try:
         try:
             image = Image.open(image_path)
         except Image.DecompressionBombError:
-            return (None, None, None, None)
+            return None
+        ### REMOVE!!!
+        except FileNotFoundError:
+            return None
         
         try:
             image = image.convert("RGB")
             image = image.resize((IMAGE_SIZE, IMAGE_SIZE))
         except OSError:
-            return (None, None, None, None)
+            return None
     except UnidentifiedImageError:
-        return (None, None, None, None)
+        return None
     
     image_array = np.array(image, dtype=np.uint8)
     image_float = image_array.astype(np.float32) / 255.0
     image_mean = np.mean(image_float, axis=(0, 1)).tolist()
     image_std = np.std(image_float, axis=(0, 1)).tolist()
     
+    ### FIX!!!!!
+    tags = tags[1:-1].split(" ")
+    tags = [tag.strip("\n").strip("'") for tag in tags]
+    # tags = tags.split(tag_splitter)
     indices = [tag_indices["tag2idx"][tag] for tag in tags]
     tag_array = np.zeros(vocab_size, dtype=np.int64)
     tag_array[indices] = 1
@@ -65,34 +83,33 @@ def image_and_tags(id_, tags, file_extension):
         np.save(memfile, tag_array)
         tag_binary = bytearray(memfile.getvalue())
     
-    return (image_binary, image_mean, image_std, tag_binary)
+    output = pd.Series({
+        "id": id_,
+        "image_binary": image_binary,
+        "image_mean": image_mean,
+        "image_std": image_std,
+        "tag_binary": tag_binary
+    })
+    return output
 
 
-iat_schema = T.StructType([
-    T.StructField("image_binary", T.BinaryType(), True),
-    T.StructField("image_mean", T.ArrayType(T.FloatType()), True),
-    T.StructField("image_std", T.ArrayType(T.FloatType()), True),
-    T.StructField("tag_binary", T.BinaryType(), True)
-])
-
-spark = SparkSession.builder.appName("dataset_final").getOrCreate()
+iat_schema = {
+    "id": int,
+    "image_binary": object,
+    "image_mean": object,
+    "image_std": object,
+    "tag_binary": object
+}
 
 skeleton_url = skeleton_parquet.lstrip(".").strip("/")
 full_skeleton_url = f"file://{os.getcwd()}/{skeleton_url}"
-df = spark.read.parquet(full_skeleton_url)
+ddf = dd.read_parquet(full_skeleton_url)
 
-total_rows = df.count()
+ddf = ddf[ddf["id"] < 100]
 
-image_and_tags_spark = spark.udf.register("image_and_tags", image_and_tags, iat_schema)
+total_rows = len(ddf)
 
-df = df.limit(100)
-
-df = df.orderBy(F.rand())
-df = df.withColumn("index", F.monotonically_increasing_id())
-
-df = df.withColumn("chunk", F.col("index") % math.ceil(df.count() / CHUNKS))
-df = df.drop(F.col("index"))
-
+"""
 # https://google.github.io/tensorstore/python/tutorial.html
 image_dataset = ts.open({
     "driver": "zarr",
@@ -129,6 +146,29 @@ tags_dataset = ts.open({
     "create": True,
     "delete_existing": True
 }).result()
+"""
+
+ddf["chunk"] = ddf["id"] % np.ceil(total_rows / CHUNKS)
+
+current_index = 0
+for chunk in range(CHUNKS):
+    chunked_ddf = ddf[ddf["chunk"] == chunk]
+    chunked_ddf = chunked_ddf.drop(columns=["chunk"])
+    chunked_ddf = chunked_ddf.apply(lambda row: image_and_tags(row["id"], row["tags"], row["file_extension"]), axis=1, meta=iat_schema)
+    print(chunked_ddf.compute())
+    chunked_ddf = chunked_ddf.dropna()
+    
+    for index, row in chunked_ddf.iterrows():
+        print(index, row)
+        
+    
+
+"""
+df = df.orderBy(F.rand())
+df = df.withColumn("index", F.monotonically_increasing_id())
+
+df = df.withColumn("chunk", F.col("index") % math.ceil(df.count() / CHUNKS))
+df = df.drop(F.col("index"))
 
 current_index = 0
 for chunk in range(CHUNKS):
@@ -150,3 +190,4 @@ for chunk in range(CHUNKS):
         current_index += 1
 
     break
+"""

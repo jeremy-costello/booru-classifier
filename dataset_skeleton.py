@@ -103,9 +103,11 @@ for id_ in tqdm(id_list):
                     break
     if to_add:
         dataset_dict[id_] = {
-            "tags": final_tag_list,
+            "tags": tag_splitter.join(final_tag_list),
             "file_extension": file_extension
         }
+
+conn.close()
 
 for key in (set(dataset_dict.keys()) & ids_to_remove_set):
     del dataset_dict[key]

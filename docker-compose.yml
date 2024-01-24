@@ -7,7 +7,7 @@ services:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - booru-data:/booru-classifier/data  # Adjust the path as needed# docker-compose.yml
+      - booru-data:/booru-classifier/data
     tty: true
     stdin_open: true
 
