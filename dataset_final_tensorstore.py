@@ -50,9 +50,6 @@ def image_and_tags(id_, tags, file_extension):
             image = Image.open(image_path)
         except Image.DecompressionBombError:
             return None
-        ### REMOVE!!!
-        except FileNotFoundError:
-            return None
         
         try:
             image = image.convert("RGB")
@@ -67,10 +64,7 @@ def image_and_tags(id_, tags, file_extension):
     image_mean = np.mean(image_float, axis=(0, 1)).tolist()
     image_std = np.std(image_float, axis=(0, 1)).tolist()
     
-    ### FIX!!!!!
-    tags = tags[1:-1].split(" ")
-    tags = [tag.strip("\n").strip("'") for tag in tags]
-    # tags = tags.split(tag_splitter)
+    tags = tags.split(tag_splitter)
     indices = [tag_indices["tag2idx"][tag] for tag in tags]
     tag_array = np.zeros(vocab_size, dtype=np.int64)
     tag_array[indices] = 1
@@ -113,25 +107,25 @@ total_rows = len(ddf)
 if LOAD_TENSORSTORES:
     # https://google.github.io/tensorstore/python/tutorial.html
     image_dataset = ts.open({
-        "driver": "zarr",
+        "driver": "n5",
         "kvstore": {
             "driver": "file",
             "path": image_tensorstore_file
         },
         "metadata": {
-            "compressor": {
-                "id": "gzip"
+            "compression": {
+                "type": "gzip"
             },
-            "dtype": "|u1",
-            "shape": [total_rows, IMAGE_SIZE, IMAGE_SIZE, CHANNEL_SIZE],
-            "chunks": [1, IMAGE_SIZE, IMAGE_SIZE, CHANNEL_SIZE]
+            "dataType": "uint8",
+            "dimensions": [total_rows, IMAGE_SIZE, IMAGE_SIZE, CHANNEL_SIZE],
+            "blockSize": [1, IMAGE_SIZE, IMAGE_SIZE, CHANNEL_SIZE]
         },
         "create": True,
         "delete_existing": True
     }).result()
 
     tags_dataset = ts.open({
-        "driver": "zarr",
+        "driver": "n5",
         "kvstore": {
             "driver": "file",
             "path": tags_tensorstore_file
@@ -140,9 +134,9 @@ if LOAD_TENSORSTORES:
             "compression": {
                 "type": "gzip"
             },
-            "dtype": "|i8",
-            "shape": [total_rows, vocab_size],
-            "chunks": [1, vocab_size]
+            "dataType": "int64",
+            "dimensions": [total_rows, vocab_size],
+            "blockSize": [1, vocab_size]
         },
         "create": True,
         "delete_existing": True
