@@ -18,4 +18,4 @@ Download tagged images from any booru with similar structure to [safebooru](http
 - update pytorch dataset
 - finish training code
 - train a model
-- pyspark -> dask (WIP)
+- move all parameters into parameters.py and move parameters.py into data folder
