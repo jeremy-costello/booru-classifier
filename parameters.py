@@ -2,7 +2,7 @@ PARAMETER_DICT = {
     "booru_url": "https://safebooru.org",
     "large_file_root": "./data",
     "large_files": {
-        "database_file": "safebooru.db",
+        "database_file": "booru.db",
         "image_save_root": "images",
         "train_parquet_file": "train.parquet",
         "valid_parquet_file": "valid.parquet",

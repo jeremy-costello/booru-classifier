@@ -10,6 +10,7 @@ from parameters import build_parameter_dict
 
 
 MAX_RETRIES = 10
+DEBUG = True
 
 
 parameter_dict = build_parameter_dict()
@@ -128,6 +129,10 @@ async def get_all_tags():
         
         update_database(results, cursor)
         conn.commit()
+        
+        if DEBUG and depth == 2:
+            break
+        
     conn.close()
 
 

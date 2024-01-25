@@ -2,6 +2,7 @@ import os
 import json
 import random
 import sqlite3
+import pandas as pd
 from tqdm import tqdm
 import dask.dataframe as dd
 
@@ -153,12 +154,12 @@ tag_counts = {key: value for key, value in
 with open(tag_counts_file, "w") as f:
     json.dump(tag_counts, f, indent=4)
 
-# gotta fix this
-ddf = dd.from_dict(dataset_dict, npartitions=PARTITIONS)
+dictionary_list = [{"id": key, **values} for key, values in dataset_dict.items()]
+ddf = dd.from_pandas(pd.DataFrame(dictionary_list), npartitions=PARTITIONS)
 
 skeleton_url = skeleton_parquet.lstrip(".").strip("/")
 full_skeleton_url = f"file://{os.getcwd()}/{skeleton_url}"
-ddf.to_parquet(full_skeleton_url, write_options={'compression': 'snappy'}).compute()
+ddf.to_parquet(full_skeleton_url)
 
 # input: id -> image array || output: tag strings -> n-hot tags
 print(len(dataset_dict))

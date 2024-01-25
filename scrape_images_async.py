@@ -14,6 +14,7 @@ from parameters import build_parameter_dict
 GOOD_EXTENSIONS = ["jpeg", "jpg", "png"]
 BATCH_SIZE = 8192
 MAX_RETRIES = 10
+DEBUG = True
 
 
 parameter_dict = build_parameter_dict()
@@ -145,14 +146,18 @@ async def download_all_images():
     cursor.execute("SELECT id FROM images")
     image_set = set([row[0] for row in cursor.fetchall()])
 
-    if download_type == "posts":
-        cursor.execute("SELECT COUNT(*) FROM posts")
-    elif download_type == "timeouts":
-        cursor.execute(f"SELECT COUNT(*) FROM images WHERE timeout = 1")
+    if DEBUG:
+        num_batches = 1
     else:
-        download_type_else()
+        if download_type == "posts":
+            cursor.execute("SELECT COUNT(*) FROM posts")
+        elif download_type == "timeouts":
+            cursor.execute(f"SELECT COUNT(*) FROM images WHERE timeout = 1")
+        else:
+            download_type_else()
 
-    num_batches = math.ceil(cursor.fetchone()[0] / BATCH_SIZE)
+        num_batches = math.ceil(cursor.fetchone()[0] / BATCH_SIZE)
+    
     for batch in tqdm(range(num_batches)):
         if download_type == "posts":
             query = "SELECT id, file_url, file_extension FROM posts LIMIT ? OFFSET ?"

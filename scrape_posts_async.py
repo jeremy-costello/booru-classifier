@@ -22,6 +22,7 @@ MAP_DICT = {
     "true": True,
     "false": False
 }
+DEBUG = True
 
 parameter_dict = build_parameter_dict()
 
@@ -198,6 +199,10 @@ async def get_all_posts():
 
     tag_list = []
     page_list = []
+    
+    if DEBUG:
+        full_tag_list = full_tag_list[:50]
+    
     for it, tag in tqdm(enumerate(full_tag_list)):
         cursor.execute("SELECT EXISTS (SELECT 1 FROM completed_tags WHERE tag_name = ?)", (tag,))
         tag_completed = cursor.fetchone()[0]
