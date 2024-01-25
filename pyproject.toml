@@ -11,9 +11,10 @@ python = "^3.12"
 aiofiles = "^23.2.1"
 aiohttp = "^3.9.1"
 beautifulsoup4 = "^4.12.3"
-dask = "^2024.1.0"
+dask = { version = "^2024.1.0", extras = ["dataframe"] }
 numpy = "^1.26.3"
 pillow = "^10.2.0"
+pyarrow = { path = "./pyarrow-15.0.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"}
 tensorstore = { path = "./tensorstore-0.1.52-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl" }
 tqdm = "^4.66.1"
 

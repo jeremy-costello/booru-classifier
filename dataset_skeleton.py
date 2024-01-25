@@ -1,6 +1,5 @@
 import os
 import json
-import math
 import random
 import sqlite3
 from tqdm import tqdm
@@ -154,9 +153,8 @@ tag_counts = {key: value for key, value in
 with open(tag_counts_file, "w") as f:
     json.dump(tag_counts, f, indent=4)
 
-dictionary_list = [{'id': key, **values} for key, values in dataset_dict.items()]
-
-ddf = dd.from_pandas(dictionary_list, npartitions=PARTITIONS)
+# gotta fix this
+ddf = dd.from_dict(dataset_dict, npartitions=PARTITIONS)
 
 skeleton_url = skeleton_parquet.lstrip(".").strip("/")
 full_skeleton_url = f"file://{os.getcwd()}/{skeleton_url}"
