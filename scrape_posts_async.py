@@ -7,13 +7,11 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 from tqdm.asyncio import tqdm, tqdm_asyncio
 
-from parameters import build_parameter_dict
+from data.parameters import build_parameter_dict
 
 
 YEAR_CUTOFF = 2024
 TAG_SPLITTER = "||"
-MIN_BATCH_SIZE = 8192
-MAX_RETRIES = 10
 IGNORE_KEYS = []
 INT_KEYS = ["height", "score", "sample_width", "sample_height", "id",
             "width", "change", "creator_id", "preview_width", "preview_height"]
@@ -22,12 +20,14 @@ MAP_DICT = {
     "true": True,
     "false": False
 }
-DEBUG = True
 
 parameter_dict = build_parameter_dict()
 
 booru_url = parameter_dict["booru_url"]
 database_file = parameter_dict["database_file"]
+min_batch_size = parameter_dict["scraping"]["post_min_batch_size"]
+max_retries = parameter_dict["scraping"]["max_retries"]
+debug = parameter_dict["scraping"]["debug"]
 
 
 def create_tables(cursor):
@@ -116,7 +116,7 @@ async def get_xml_tree(tag, page, session):
             pass
         except asyncio.TimeoutError:
             pass
-        if retry >= MAX_RETRIES:
+        if retry >= max_retries:
             raise TimeoutError("Max retries exceeded.")
 
 
@@ -200,7 +200,7 @@ async def get_all_posts():
     tag_list = []
     page_list = []
     
-    if DEBUG:
+    if debug:
         full_tag_list = full_tag_list[:50]
     
     for it, tag in tqdm(enumerate(full_tag_list)):
@@ -215,7 +215,7 @@ async def get_all_posts():
             page_list.extend(list(range(total_pages)))
 
             assert len(tag_list) == len(page_list)
-            if (len(tag_list) >= MIN_BATCH_SIZE) or (it == (len(full_tag_list) - 1)):
+            if (len(tag_list) >= min_batch_size) or (it == (len(full_tag_list) - 1)):
                 cursor.execute("SELECT id FROM posts")
                 post_id_set = set([row[0] for row in cursor.fetchall()])
                 

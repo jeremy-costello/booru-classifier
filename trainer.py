@@ -8,7 +8,7 @@ from torchvision.ops import sigmoid_focal_loss
 import torchvision.transforms.v2 as transforms
 
 from reader import ParquetDataset
-from parameters import build_parameter_dict
+from data.parameters import build_parameter_dict
 from model import ConvNextV2ForMultiLabelClassification
 
 

@@ -160,8 +160,8 @@ cython_debug/
 #.idea/
 
 # CUSTOM
-data/
-!data/.gitkeep
+data/*
+!data/parameters.py
 bazel/
 final_processing.py
 *.ipynb

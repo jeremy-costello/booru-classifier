@@ -6,17 +6,16 @@ import itertools
 from bs4 import BeautifulSoup
 from tqdm.asyncio import tqdm, tqdm_asyncio
 
-from parameters import build_parameter_dict
-
-
-MAX_RETRIES = 10
-DEBUG = True
+from data.parameters import build_parameter_dict
 
 
 parameter_dict = build_parameter_dict()
 
 booru_url = parameter_dict["booru_url"]
 database_file = parameter_dict["database_file"]
+max_retries = parameter_dict["scraping"]["max_retries"]
+debug = parameter_dict["scraping"]["debug"]
+
 search_dict = dict()
 
 
@@ -53,7 +52,7 @@ async def get_soup(tag_start, session):
             pass
         except asyncio.TimeoutError:
             pass
-        if retry >= MAX_RETRIES:
+        if retry >= max_retries:
             raise TimeoutError("Max retries exceeded.")
 
 
@@ -130,7 +129,7 @@ async def get_all_tags():
         update_database(results, cursor)
         conn.commit()
         
-        if DEBUG and depth == 2:
+        if debug and depth == 1:
             break
         
     conn.close()

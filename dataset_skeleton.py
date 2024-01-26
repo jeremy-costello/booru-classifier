@@ -6,12 +6,9 @@ import pandas as pd
 from tqdm import tqdm
 import dask.dataframe as dd
 
-from parameters import build_parameter_dict
+from data.parameters import build_parameter_dict
 
 
-PARTITIONS = 32
-MIN_COUNT = 50
-COUNT_LIMIT = 5000
 LIMITED_TYPES = ["artist", "copyright", "model"]
 IGNORE_TAGS = [
     # alphabetical
@@ -45,6 +42,9 @@ database_file = parameter_dict["database_file"]
 tag_indices_file = parameter_dict["tag_indices_json"]
 tag_counts_file = parameter_dict["tag_counts_json"]
 skeleton_parquet = parameter_dict["skeleton_parquet_file"]
+partitions = parameter_dict["dataset"]["skeleton_partitions"]
+min_count = parameter_dict["dataset"]["min_tag_count"]
+count_limit = parameter_dict["dataset"]["tag_count_limit"]
 
 conn = sqlite3.connect(database_file)
 cursor = conn.cursor()
@@ -64,9 +64,9 @@ type_list = [row[2] for row in tag_list]
 tag_set = set()
 limit_dict = dict()
 for name, count, type_ in zip(name_list, count_list, type_list):
-    if name not in IGNORE_TAGS and count >= MIN_COUNT:
+    if name not in IGNORE_TAGS and count >= min_count:
         tag_set.add(name)
-        if type_ in LIMITED_TYPES and count > COUNT_LIMIT:
+        if type_ in LIMITED_TYPES and count > count_limit:
             limit_dict[name] = {
                 "ids": [],
                 "seen": 0
@@ -89,13 +89,13 @@ for id_ in tqdm(id_list):
             final_tag_list.append(tag)
         if tag in limit_dict.keys():
             # reservoir sampling
-            if limit_dict[tag]["seen"] < COUNT_LIMIT:
+            if limit_dict[tag]["seen"] < count_limit:
                 limit_dict[tag]["ids"].append(id_)
                 limit_dict[tag]["seen"] += 1
             else:
                 idx = random.randint(0, limit_dict[tag]["seen"])
                 limit_dict[tag]["seen"] += 1
-                if idx < COUNT_LIMIT:
+                if idx < count_limit:
                     ids_to_remove_set.add(limit_dict[tag]["ids"][idx])
                     limit_dict[tag]["ids"][idx] = id_
                 else:
@@ -103,7 +103,7 @@ for id_ in tqdm(id_list):
                     break
     if to_add:
         dataset_dict[id_] = {
-            "tags": tag_splitter.join(final_tag_list),
+            "tags": final_tag_list,
             "file_extension": file_extension
         }
 
@@ -127,7 +127,7 @@ tag_indices = {
     "idx2tag": dict()
 }
 for tag, count in tag_counts.items():
-    if count >= MIN_COUNT:
+    if count >= min_count:
         idx = tag_indices["vocab_size"]
         tag_indices["tag2idx"][tag] = idx
         tag_indices["idx2tag"][idx] = tag
@@ -138,7 +138,8 @@ for id_, info_dict in dataset_dict.items():
     tags = info_dict["tags"]
     pruned_tags = [tag for tag in tags if tag in tag_indices["tag2idx"].keys()]
     if pruned_tags:
-        dataset_dict[id_]["tags"] = pruned_tags
+        # string or list???
+        dataset_dict[id_]["tags"] = tag_splitter.join(pruned_tags)
     else:
         ids_to_remove_set.add(id_)
 
@@ -150,12 +151,12 @@ with open(tag_indices_file, "w") as f:
 
 tag_counts = {key: value for key, value in
               sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)
-              if value >= MIN_COUNT}
+              if value >= min_count}
 with open(tag_counts_file, "w") as f:
     json.dump(tag_counts, f, indent=4)
 
 dictionary_list = [{"id": key, **values} for key, values in dataset_dict.items()]
-ddf = dd.from_pandas(pd.DataFrame(dictionary_list), npartitions=PARTITIONS)
+ddf = dd.from_pandas(pd.DataFrame(dictionary_list), npartitions=partitions)
 
 skeleton_url = skeleton_parquet.lstrip(".").strip("/")
 full_skeleton_url = f"file://{os.getcwd()}/{skeleton_url}"

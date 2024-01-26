@@ -8,16 +8,10 @@ import tensorstore as ts
 import dask.dataframe as dd
 from PIL import Image, UnidentifiedImageError
 
-from parameters import build_parameter_dict
+from data.parameters import build_parameter_dict
 
 
 # still testing this. lock-file error with tensorstore
-IMAGE_SIZE = 224
-CHANNEL_SIZE = 3
-CHUNKS = 10
-LOAD_TENSORSTORES = False
-
-
 parameter_dict = build_parameter_dict()
 
 database_file = parameter_dict["database_file"]
@@ -26,6 +20,10 @@ tag_indices_file = parameter_dict["tag_indices_json"]
 skeleton_parquet = parameter_dict["skeleton_parquet_file"]
 image_tensorstore_file = parameter_dict["image_tensorstore_file"]
 tags_tensorstore_file = parameter_dict["tags_tensorstore_file"]
+image_size = parameter_dict["dataset"]["image_size"]
+channel_size = parameter_dict["dataset"]["channel_size"]
+chunks = parameter_dict["dataset"]["final_chunks"]
+load_tensorstores = parameter_dict["dataset"]["load_tensorstores"]
 
 conn = sqlite3.connect(database_file)
 cursor = conn.cursor()
@@ -53,7 +51,7 @@ def image_and_tags(id_, tags, file_extension):
         
         try:
             image = image.convert("RGB")
-            image = image.resize((IMAGE_SIZE, IMAGE_SIZE))
+            image = image.resize((image_size, image_size))
         except OSError:
             return None
     except UnidentifiedImageError:
@@ -104,7 +102,7 @@ ddf = dd.read_parquet(full_skeleton_url)
 
 total_rows = len(ddf)
 
-if LOAD_TENSORSTORES:
+if load_tensorstores:
     # https://google.github.io/tensorstore/python/tutorial.html
     image_dataset = ts.open({
         "driver": "n5",
@@ -117,8 +115,8 @@ if LOAD_TENSORSTORES:
                 "type": "gzip"
             },
             "dataType": "uint8",
-            "dimensions": [total_rows, IMAGE_SIZE, IMAGE_SIZE, CHANNEL_SIZE],
-            "blockSize": [1, IMAGE_SIZE, IMAGE_SIZE, CHANNEL_SIZE]
+            "dimensions": [total_rows, image_size, image_size, channel_size],
+            "blockSize": [1, image_size, image_size, channel_size]
         },
         "create": True,
         "delete_existing": True
@@ -142,10 +140,10 @@ if LOAD_TENSORSTORES:
         "delete_existing": True
     }).result()
 
-ddf["chunk"] = ddf["id"] % np.ceil(total_rows / CHUNKS)
+ddf["chunk"] = ddf["id"] % np.ceil(total_rows / chunks)
 
 current_index = 0
-for chunk in range(CHUNKS):
+for chunk in range(chunks):
     chunked_ddf = ddf[ddf["chunk"] == chunk]
     chunked_ddf = chunked_ddf.drop(columns=["chunk"])
     chunked_ddf = chunked_ddf.apply(iat_dask_wrapper, axis=1, result_type="expand", meta=iat_schema)

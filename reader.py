@@ -10,7 +10,7 @@ from pyspark.sql import SparkSession
 import torchvision.transforms.v2 as transforms
 from torch.utils.data import Dataset, DataLoader
 
-from parameters import build_parameter_dict
+from data.parameters import build_parameter_dict
 
 
 def main():

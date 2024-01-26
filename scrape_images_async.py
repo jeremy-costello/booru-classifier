@@ -8,19 +8,19 @@ import itertools
 from pathlib import Path
 from tqdm.asyncio import tqdm, tqdm_asyncio
 
-from parameters import build_parameter_dict
+from data.parameters import build_parameter_dict
 
 
 GOOD_EXTENSIONS = ["jpeg", "jpg", "png"]
-BATCH_SIZE = 8192
-MAX_RETRIES = 10
-DEBUG = True
 
 
 parameter_dict = build_parameter_dict()
 
 database_file = parameter_dict["database_file"]
 image_save_root = parameter_dict["image_save_root"]
+batch_size = parameter_dict["scraping"]["image_batch_size"]
+max_retries = parameter_dict["scraping"]["max_retries"]
+debug = parameter_dict["scraping"]["debug"]
 
 
 def create_tables(cursor):
@@ -77,7 +77,7 @@ async def download_image(post_id, file_url, file_extension, save_root, session):
                 downloaded = False
             except OSError:
                 downloaded = False
-            if retry >= MAX_RETRIES:
+            if retry >= max_retries:
                 timeout = True
                 # break or raise TimeoutError?
                 break
@@ -146,7 +146,7 @@ async def download_all_images():
     cursor.execute("SELECT id FROM images")
     image_set = set([row[0] for row in cursor.fetchall()])
 
-    if DEBUG:
+    if debug:
         num_batches = 1
     else:
         if download_type == "posts":
@@ -156,7 +156,7 @@ async def download_all_images():
         else:
             download_type_else()
 
-        num_batches = math.ceil(cursor.fetchone()[0] / BATCH_SIZE)
+        num_batches = math.ceil(cursor.fetchone()[0] / batch_size)
     
     for batch in tqdm(range(num_batches)):
         if download_type == "posts":
@@ -166,7 +166,7 @@ async def download_all_images():
         else:
             download_type_else()
         
-        cursor.execute(query, (BATCH_SIZE, batch * BATCH_SIZE))
+        cursor.execute(query, (batch_size, batch * batch_size))
         data_list = cursor.fetchall()
         post_id_batch = [post[0] for post in data_list]
 
