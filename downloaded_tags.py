@@ -5,9 +5,6 @@ from tqdm import tqdm
 from data.parameters import build_parameter_dict
 
 
-BATCH_SIZE = 512
-
-
 parameter_dict = build_parameter_dict()
 
 database_file = parameter_dict["database_file"]
@@ -34,9 +31,9 @@ id_list = [row[0] for row in cursor.fetchall()]
 
 tags_list = []
 cursor.execute("SELECT COUNT(*) FROM posts")
-num_batches = math.ceil(cursor.fetchone()[0] / BATCH_SIZE)
+num_batches = math.ceil(cursor.fetchone()[0] / batch_size)
 for batch in tqdm(range(num_batches)):
-    id_batch = id_list[batch * BATCH_SIZE : (batch + 1) * BATCH_SIZE]
+    id_batch = id_list[batch * batch_size : (batch + 1) * batch_size]
     question_marks = ", ".join("?" for _ in id_batch)
     query = f"SELECT tags FROM posts WHERE id in ({question_marks})"
     cursor.execute(query, tuple(id_batch))

@@ -2,7 +2,7 @@ import os
 import json
 import sqlite3
 import numpy as np
-#from tqdm import tqdm
+from tqdm import tqdm
 from io import BytesIO
 import tensorstore as ts
 import dask.dataframe as dd
@@ -18,8 +18,8 @@ database_file = parameter_dict["database_file"]
 image_save_root = parameter_dict["image_save_root"]
 tag_indices_file = parameter_dict["tag_indices_json"]
 skeleton_parquet = parameter_dict["skeleton_parquet_file"]
-image_tensorstore_file = parameter_dict["image_tensorstore_file"]
-tags_tensorstore_file = parameter_dict["tags_tensorstore_file"]
+image_tensorstore_file = parameter_dict["image_tensorstore_file"].lstrip(".").strip("/")
+tags_tensorstore_file = parameter_dict["tags_tensorstore_file"].lstrip(".").strip("/")
 image_size = parameter_dict["dataset"]["image_size"]
 channel_size = parameter_dict["dataset"]["channel_size"]
 chunks = parameter_dict["dataset"]["final_chunks"]
@@ -59,23 +59,15 @@ def image_and_tags(id_, tags, file_extension):
     
     image_array = np.array(image, dtype=np.uint8)
     image_float = image_array.astype(np.float32) / 255.0
-    image_mean = np.mean(image_float, axis=(0, 1)).tolist()
-    image_std = np.std(image_float, axis=(0, 1)).tolist()
+    image_mean = np.mean(image_float, axis=(0, 1))
+    image_std = np.std(image_float, axis=(0, 1))
     
     tags = tags.split(tag_splitter)
     indices = [tag_indices["tag2idx"][tag] for tag in tags]
-    tag_array = np.zeros(vocab_size, dtype=np.int64)
-    tag_array[indices] = 1
-
-    with BytesIO() as memfile:
-        np.save(memfile, image_array)
-        image_binary = bytearray(memfile.getvalue())
+    tags_array = np.zeros(vocab_size, dtype=np.int64)
+    tags_array[indices] = 1
     
-    with BytesIO() as memfile:
-        np.save(memfile, tag_array)
-        tag_binary = bytearray(memfile.getvalue())
-    
-    output = (id_, image_binary, image_mean, image_std, tag_binary)
+    output = (id_, image_array, image_mean, image_std, tags_array)
     return output
 
 
@@ -90,10 +82,10 @@ def iat_dask_wrapper(row):
 
 iat_schema = {
     0: int,
-    1: object,
-    2: object,
-    3: object,
-    4: object
+    1: np.zeros((image_size, image_size, channel_size), dtype=np.uint8),
+    2: np.zeros(channel_size, dtype=np.float32),
+    3: np.zeros(channel_size, dtype=np.float32),
+    4: np.zeros(vocab_size, dtype=np.int64)
 }
 
 skeleton_url = skeleton_parquet.lstrip(".").strip("/")
@@ -143,21 +135,16 @@ if load_tensorstores:
 ddf["chunk"] = ddf["id"] % np.ceil(total_rows / chunks)
 
 current_index = 0
-for chunk in range(chunks):
+for chunk in tqdm(range(chunks)):
     chunked_ddf = ddf[ddf["chunk"] == chunk]
     chunked_ddf = chunked_ddf.drop(columns=["chunk"])
     chunked_ddf = chunked_ddf.apply(iat_dask_wrapper, axis=1, result_type="expand", meta=iat_schema)
     chunked_ddf = chunked_ddf.dropna()
     chunked_ddf = chunked_ddf.reset_index(drop=True)
-    chunked_ddf.columns = ["id", "image_binary", "image_mean", "image_std", "tag_binary"]
+    chunked_ddf.columns = ["id", "image_array", "image_mean", "image_std", "tags_array"]
     
-    for index, row in chunked_ddf.iterrows():
-        image = np.load(BytesIO(row.image_binary))
-        tags = np.load(BytesIO(row.tags_binary))
-        
-        image_dataset[current_index, :, :, :].write(image).result()
-        tags_dataset[current_index, :].write(tags).result()
+    for index, row in tqdm(chunked_ddf.iterrows(), total=len(chunked_ddf), leave=False):
+        image_dataset[current_index, :, :, :].write(row.image_array).result()
+        tags_dataset[current_index, :].write(row.tags_array).result()
         
         current_index += 1
-    
-    break

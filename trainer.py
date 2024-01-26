@@ -12,14 +12,12 @@ from data.parameters import build_parameter_dict
 from model import ConvNextV2ForMultiLabelClassification
 
 
-NUM_EPOCHS = 10
-LEARNING_RATE = 3e-4
-
-
 parameter_dict = build_parameter_dict()
 
 # data stuff
 train_parquet_file = parameter_dict["train_parquet_file"]
+num_epochs = parameter_dict["training"]["num_epochs"]
+learning_rate = parameter_dict["training"]["learning_rate"]
 
 dataset_statistics_file = parameter_dict["dataset_statistics_json"]
 tag_indices_file = parameter_dict["tag_indices_json"]
@@ -55,7 +53,7 @@ model = ConvNextV2ForMultiLabelClassification(
     vocab_size=tag_indices_file["vocab_size"],
     use_sigmoid=False
 )
-optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE)
+optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 # loss_function = torch.nn.BCELoss()
 
 fabric = L.Fabric(accelerator="cuda", devices=1, strategy="fsdp")
@@ -65,7 +63,7 @@ model, optimizer = fabric.setup(model, optimizer)
 dataloader = fabric.setup_dataloaders(dataloader)
 
 model.train()
-for epoch in tqdm(range(NUM_EPOCHS)):
+for epoch in tqdm(range(num_epochs)):
     for batch in tqdm(dataloader, leave=False):
         optimizer.zero_grad()
 

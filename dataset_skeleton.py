@@ -138,7 +138,6 @@ for id_, info_dict in dataset_dict.items():
     tags = info_dict["tags"]
     pruned_tags = [tag for tag in tags if tag in tag_indices["tag2idx"].keys()]
     if pruned_tags:
-        # string or list???
         dataset_dict[id_]["tags"] = tag_splitter.join(pruned_tags)
     else:
         ids_to_remove_set.add(id_)
