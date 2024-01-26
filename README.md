@@ -14,8 +14,7 @@ Download tagged images from any booru with similar structure to [safebooru](http
 - run ```dataset_final_tensorstore.py``` to store image arrays in a [tensorstore](https://google.github.io/tensorstore/). (WIP)
 
 # todo
-- tensorstore doesn't work on WSL (lock file issue). add docker or test on actual Ubuntu
+- tensorstore async, train and validation splits
 - update pytorch dataset
 - finish training code
 - train a model
-- finish tensorstore code
