@@ -15,6 +15,7 @@ Download tagged images from any booru with similar structure to [safebooru](http
 
 # todo
 - tensorstore async, train and validation splits, n5 vs. zarr?
+- calculate mean of image means and stdevs, and store in json(?) file
 - update pytorch dataset
 - finish training code
 - train a model
