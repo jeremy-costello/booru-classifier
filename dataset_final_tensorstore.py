@@ -24,6 +24,7 @@ validation_fraction = parameter_dict["dataset"]["validation_fraction"]
 image_size = parameter_dict["dataset"]["image_size"]
 channel_size = parameter_dict["dataset"]["channel_size"]
 chunks = parameter_dict["dataset"]["final_chunks"]
+stats_rounding = parameter_dict["dataset"]["stats_rounding"]
 load_tensorstores = parameter_dict["dataset"]["load_tensorstores"]
 
 conn = sqlite3.connect(database_file)
@@ -117,6 +118,7 @@ if load_tensorstores:
 
     
     validation_set = set(ddf["id"].sample(frac=validation_fraction).compute())
+    print(len(validation_set))
     
     rows = dict()
     rows["valid"] = len(validation_set)
@@ -134,23 +136,22 @@ if load_tensorstores:
     
     tensorstores = dict()
     for split in ["train", "valid"]:
+        tensorstores[split] = dict()
         for data_type in ["image", "tags"]:
             tensorstore_file = tensorstore_file_template.format(split=split, data_type=data_type)
-            dimensions = rows[split] + data_size[data_type]
+            dimensions = [rows[split]] + data_size[data_type]
             dtype = dtypes[data_type]
             tensorstores[split][data_type] = create_tensorstore(tensorstore_file, dimensions, dtype)
 
-ddf["chunk"] = ddf["id"] % np.ceil(total_rows / chunks)
+ddf["chunk"] = ddf["id"] % chunks
 
-dataset_statistics_dict = {
-    "count": 0,
+dataset_stats = {
+    "count": {
+        "train": 0,
+        "valid": 0
+    },
     "mean": 0,
     "std": 0
-}
-
-count_indices = {
-    "train": 0,
-    "valid": 0
 }
 
 for chunk in tqdm(range(chunks)):
@@ -164,19 +165,21 @@ for chunk in tqdm(range(chunks)):
     for index, row in tqdm(chunked_ddf.iterrows(), total=len(chunked_ddf), leave=False):
         if row.id not in validation_set:
             split = "train"
-            dataset_statistics_dict["count"] += 1
-            dataset_statistics_dict["mean"] += row.image_mean
-            dataset_statistics_dict["std"] += row.image_std
+            dataset_stats["mean"] += row.image_mean
+            dataset_stats["std"] += row.image_std
         else:
             split = "valid"
         
-        tensorstores[split]["image"][count_indices[split], :, :, :].write(row.image_array).result()
-        tensorstores[split]["tags"][count_indices[split], :].write(row.tags_array).result()
+        tensorstores[split]["image"][dataset_stats["count"][split], :, :, :].write(row.image_array).result()
+        tensorstores[split]["tags"][dataset_stats["count"][split], :].write(row.tags_array).result()
         
-        count_indices[split] += 1
+        dataset_stats["count"][split] += 1
+
+print(dataset_stats["count"])
 
 for stat in ["mean", "std"]:
-    dataset_statistics_dict[stat] = dataset_statistics_dict[stat] / dataset_statistics_dict["count"]
+    dataset_stats[stat] = [round(stat, stats_rounding) for stat in
+                           (dataset_stats[stat] / dataset_stats["count"]["train"]).tolist()]
 
 with open(dataset_statistics_json, "w") as f:
-    json.dump(dataset_statistics_dict, f, indent=4)
+    json.dump(dataset_stats, f, indent=4)

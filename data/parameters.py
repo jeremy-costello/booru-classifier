@@ -29,7 +29,8 @@ PARAMETER_DICT = {
         "image_size": 224,
         "channel_size": 3,
         "final_chunks": 10,
-        "load_tensorstores": False
+        "stats_rounding": 4,
+        "load_tensorstores": True
     },
     "training": {
         "num_epochs": 10,
