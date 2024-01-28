@@ -3,7 +3,6 @@ import json
 import sqlite3
 import numpy as np
 from tqdm import tqdm
-from io import BytesIO
 import tensorstore as ts
 import dask.dataframe as dd
 from PIL import Image, UnidentifiedImageError
@@ -11,15 +10,17 @@ from PIL import Image, UnidentifiedImageError
 from data.parameters import build_parameter_dict
 
 
-# still testing this. lock-file error with tensorstore
 parameter_dict = build_parameter_dict()
 
 database_file = parameter_dict["database_file"]
 image_save_root = parameter_dict["image_save_root"]
 tag_indices_file = parameter_dict["tag_indices_json"]
 skeleton_parquet = parameter_dict["skeleton_parquet_file"]
-image_tensorstore_file = parameter_dict["image_tensorstore_file"].lstrip(".").strip("/")
-tags_tensorstore_file = parameter_dict["tags_tensorstore_file"].lstrip(".").strip("/")
+parquet_file_template = parameter_dict["parquet_file_template"]
+tensorstore_file_template = parameter_dict["tensorstore_file_template"].lstrip(".").strip("/")
+dataset_statistics_json = parameter_dict["dataset_statistics_json"]
+
+validation_fraction = parameter_dict["dataset"]["validation_fraction"]
 image_size = parameter_dict["dataset"]["image_size"]
 channel_size = parameter_dict["dataset"]["channel_size"]
 chunks = parameter_dict["dataset"]["final_chunks"]
@@ -95,46 +96,57 @@ ddf = dd.read_parquet(full_skeleton_url)
 total_rows = len(ddf)
 
 if load_tensorstores:
-    # https://google.github.io/tensorstore/python/tutorial.html
-    image_dataset = ts.open({
-        "driver": "n5",
-        "kvstore": {
-            "driver": "file",
-            "path": image_tensorstore_file
-        },
-        "metadata": {
-            "compression": {
-                "type": "gzip"
+    def create_tensorstore(tensorstore_file, dimensions):
+        return ts.open({
+            "driver": "n5",
+            "kvstore": {
+                "driver": "file",
+                "path": tensorstore_file
             },
-            "dataType": "uint8",
-            "dimensions": [total_rows, image_size, image_size, channel_size],
-            "blockSize": [1, image_size, image_size, channel_size]
-        },
-        "create": True,
-        "delete_existing": True
-    }).result()
+            "metadata": {
+                "compression": {
+                    "type": "gzip"
+                },
+                "dataType": "uint8",
+                "dimensions": dimensions,
+                "blockSize": [1] + dimensions[1:]
+            },
+            "create": True,
+            "delete_existing": True
+        }).result()
 
-    tags_dataset = ts.open({
-        "driver": "n5",
-        "kvstore": {
-            "driver": "file",
-            "path": tags_tensorstore_file
-        },
-        "metadata": {
-            "compression": {
-                "type": "gzip"
-            },
-            "dataType": "int64",
-            "dimensions": [total_rows, vocab_size],
-            "blockSize": [1, vocab_size]
-        },
-        "create": True,
-        "delete_existing": True
-    }).result()
+    
+    validation_set = set(ddf["id"].sample(frac=validation_fraction).compute())
+    
+    rows = dict()
+    rows["valid"] = len(validation_set)
+    rows["train"] = total_rows - rows["valid"]
+    
+    data_size = {
+        "image": [image_size, image_size, channel_size],
+        "tags": [vocab_size]
+    }
+    
+    tensorstores = dict()
+    for split in ["train", "valid"]:
+        for data_type in ["image", "tags"]:
+            tensorstore_file = tensorstore_file_template.format(split=split, data_type=data_type)
+            dimensions = rows[split] + data_size[data_type]
+            tensorstores[split][data_type] = create_tensorstore(tensorstore_file, dimensions)
 
 ddf["chunk"] = ddf["id"] % np.ceil(total_rows / chunks)
 
-current_index = 0
+dataset_statistics_dict = {
+    "count": 0,
+    "mean": 0,
+    "std": 0
+}
+
+count_indices = {
+    "train": 0,
+    "valid": 0
+}
+
 for chunk in tqdm(range(chunks)):
     chunked_ddf = ddf[ddf["chunk"] == chunk]
     chunked_ddf = chunked_ddf.drop(columns=["chunk"])
@@ -144,7 +156,21 @@ for chunk in tqdm(range(chunks)):
     chunked_ddf.columns = ["id", "image_array", "image_mean", "image_std", "tags_array"]
     
     for index, row in tqdm(chunked_ddf.iterrows(), total=len(chunked_ddf), leave=False):
-        image_dataset[current_index, :, :, :].write(row.image_array).result()
-        tags_dataset[current_index, :].write(row.tags_array).result()
+        if row.id not in validation_set:
+            split = "train"
+            dataset_statistics_dict["count"] += 1
+            dataset_statistics_dict["mean"] += row.image_mean
+            dataset_statistics_dict["std"] += row.image_std
+        else:
+            split = "valid"
         
-        current_index += 1
+        tensorstores[split]["image"][count_indices[split], :, :, :].write(row.image_array).result()
+        tensorstores[split]["tags"][count_indices[split], :].write(row.tags_array).result()
+        
+        count_indices[split] += 1
+
+for stat in ["mean", "std"]:
+    dataset_statistics_dict[stat] = dataset_statistics_dict[stat] / dataset_statistics_dict["count"]
+
+with open(dataset_statistics_json, "w") as f:
+    json.dump(dataset_statistics_dict, f, indent=4)

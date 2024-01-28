@@ -4,10 +4,8 @@ PARAMETER_DICT = {
     "large_files": {
         "database_file": "booru.db",
         "image_save_root": "images",
-        "train_parquet_file": "train.parquet",
-        "valid_parquet_file": "valid.parquet",
-        "image_tensorstore_file": "images_store.ts",
-        "tags_tensorstore_file": "tags_store.ts"
+        "parquet_file_template": "{split}.parquet",
+        "tensorstore_file_template": "{data_type}_store_{split}.ts",
     },
     "small_file_root": "./data",
     "small_files": {
@@ -27,6 +25,7 @@ PARAMETER_DICT = {
         "skeleton_partitions": 32,
         "min_tag_count": 50,
         "tag_count_limit": 5000,
+        "validation_fraction": 0.05,
         "image_size": 224,
         "channel_size": 3,
         "final_chunks": 10,
