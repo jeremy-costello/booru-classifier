@@ -14,8 +14,7 @@ Download tagged images from any booru with similar structure to [safebooru](http
 - run ```dataset_final_tensorstore.py``` to store image arrays in a [tensorstore](https://google.github.io/tensorstore/). (WIP)
 
 # todo
-- tensorstore async, train and validation splits, n5 vs. zarr?
-- calculate mean of image means and stdevs, and store in json(?) file
+- tensorstore async, n5 vs. zarr?
 - update pytorch dataset
 - finish training code
 - train a model
