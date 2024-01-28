@@ -96,7 +96,7 @@ ddf = dd.read_parquet(full_skeleton_url)
 total_rows = len(ddf)
 
 if load_tensorstores:
-    def create_tensorstore(tensorstore_file, dimensions):
+    def create_tensorstore(tensorstore_file, dimensions, dtype):
         return ts.open({
             "driver": "n5",
             "kvstore": {
@@ -107,7 +107,7 @@ if load_tensorstores:
                 "compression": {
                     "type": "gzip"
                 },
-                "dataType": "uint8",
+                "dataType": dtype,
                 "dimensions": dimensions,
                 "blockSize": [1] + dimensions[1:]
             },
@@ -127,12 +127,18 @@ if load_tensorstores:
         "tags": [vocab_size]
     }
     
+    dtypes = {
+        "image": "uint8",
+        "tags": "int64"
+    }
+    
     tensorstores = dict()
     for split in ["train", "valid"]:
         for data_type in ["image", "tags"]:
             tensorstore_file = tensorstore_file_template.format(split=split, data_type=data_type)
             dimensions = rows[split] + data_size[data_type]
-            tensorstores[split][data_type] = create_tensorstore(tensorstore_file, dimensions)
+            dtype = dtypes[data_type]
+            tensorstores[split][data_type] = create_tensorstore(tensorstore_file, dimensions, dtype)
 
 ddf["chunk"] = ddf["id"] % np.ceil(total_rows / chunks)
 
