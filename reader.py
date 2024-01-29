@@ -1,12 +1,8 @@
 import json
-import math
 import torch
 import numpy as np
-from PIL import Image
-from io import BytesIO
 import dask.dataframe as dd
 import matplotlib.pyplot as plt
-from pyspark.sql import SparkSession
 import torchvision.transforms.v2 as transforms
 from torch.utils.data import Dataset, DataLoader
 
@@ -16,7 +12,7 @@ from data.parameters import build_parameter_dict
 def main():
     parameter_dict = build_parameter_dict()
 
-    train_parquet_file = parameter_dict["train_parquet_file"]
+    tensorstore_file_template = parameter_dict["tensorstore_file_template"]
     dataset_statistics_file = parameter_dict["dataset_statistics_json"]
 
     with open(dataset_statistics_file, 'r') as f:
@@ -31,17 +27,17 @@ def main():
         transforms.Normalize(mean=dataset_statistics["mean"], std=dataset_statistics["std"]),
     ])
 
-    dataset = ParquetDataset(train_parquet_file, transform)
+    train_dataset = ParquetDataset(tensorstore_file_template, dataset_statistics, transform, split="train")
 
-    loader = DataLoader(
-        dataset,
+    train_loader = DataLoader(
+        train_dataset,
         batch_size=4,
         shuffle=True,
         pin_memory=False,
         num_workers=0
     )
 
-    for batch in loader:
+    for batch in train_loader:
         images = batch["images"]
         tags = batch["tags"]
         fig, axes = plt.subplots(1, len(images), figsize=(15, 5))
@@ -58,43 +54,23 @@ def main():
 
 
 class ParquetDataset(Dataset):
-    def __init__(self, parquet_file, transform, partitions):
-        spark = SparkSession.builder.appName("reader").getOrCreate()
-        parquet_url = f"file://{parquet_file}"
-        df = spark.read.parquet(parquet_url)
-        self.num_rows = df.count()
+    def __init__(self, tensorstore_file_template, dataset_statistics, transform, split):
+        self.image_tensorstore = tensorstore_file_template.format(split=split, data_type="image")
+        self.tags_tensorstore = tensorstore_file_template.format(split=split, data_type="tags")
         
-        self.partition_size = math.ceil(self.num_rows / partitions)
-        divisions = [num * self.partition_size for num in range(partitions + 1)]
-        divisions[-1] = self.num_rows
-
-        self.ddf = dd.read_parquet(parquet_file)
-        self.ddf = self.ddf.reset_index(drop=True)
-        print(self.ddf.head())
-        print(self.ddf.npartitions)
-        print(self.ddf.divisions)
-
+        self.total_samples = dataset_statistics["count"][split]
+        
         self.transform = transform      
 
     def __len__(self):
-        return self.num_rows
+        return self.total_samples
     
     def __getitem__(self, idx):
-        partition_idx, row_idx = divmod(idx, self.partition_size)
-        partition_df = self.ddf.get_partition(partition_idx).compute()
-        row = partition_df.iloc[row_idx].to_dict()
-
-        # image
-        images = row["image_binary"]
-        images = Image.open(BytesIO(images))
-        images = self.transform(images)
-        # tags
-        tags = row["tag_binary"]
-        tags = np.load(BytesIO(tags))
-        tags = torch.from_numpy(tags.astype(np.float32))
+        image = self.image_tensorstore[idx, :, :, :]
+        tags = self.tags_tensorstore[idx, :]
 
         return {
-            "images": images,
+            "images": image,
             "tags": tags
         }
 

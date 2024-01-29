@@ -16,7 +16,6 @@ database_file = parameter_dict["database_file"]
 image_save_root = parameter_dict["image_save_root"]
 tag_indices_file = parameter_dict["tag_indices_json"]
 skeleton_parquet = parameter_dict["skeleton_parquet_file"]
-parquet_file_template = parameter_dict["parquet_file_template"]
 tensorstore_file_template = parameter_dict["tensorstore_file_template"].lstrip(".").strip("/")
 dataset_statistics_json = parameter_dict["dataset_statistics_json"]
 

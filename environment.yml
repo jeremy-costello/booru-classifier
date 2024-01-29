@@ -1,0 +1,22 @@
+# environment.yml
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python>=3.9,<3.13
+  - aiofiles=23
+  - aiohttp=3
+  - beautifulsoup4=4
+  - dask=2024.1
+  - numpy=1.26
+  - pandas=2.2
+  - pillow=10.2
+  - pyarrow>=14.0,<16
+  - pytorch-cuda=12.1
+  - tensorstore=0.1
+  - pytorch=2.1
+  - torchvision>=0.16,<0.18
+  - tqdm=4
+platforms:
+  - linux-64

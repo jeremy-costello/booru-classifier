@@ -15,9 +15,10 @@ from model import ConvNextV2ForMultiLabelClassification
 parameter_dict = build_parameter_dict()
 
 # data stuff
-train_parquet_file = parameter_dict["train_parquet_file"]
+tensorstore_file_template = parameter_dict["tensorstore_file_template"]
 num_epochs = parameter_dict["training"]["num_epochs"]
 learning_rate = parameter_dict["training"]["learning_rate"]
+batch_size = parameter_dict["training"]["batch_size"]
 
 dataset_statistics_file = parameter_dict["dataset_statistics_json"]
 tag_indices_file = parameter_dict["tag_indices_json"]
@@ -26,7 +27,7 @@ with open(dataset_statistics_file, 'r') as f:
     dataset_statistics = json.load(f)
 
 with open(tag_indices_file, 'r') as f:
-    tag_indices_file = json.load(f)
+    tag_indices = json.load(f)
 
 transform = transforms.Compose([
     transforms.ToImage(),
@@ -36,12 +37,21 @@ transform = transforms.Compose([
     transforms.Normalize(mean=dataset_statistics["mean"], std=dataset_statistics["std"]),
 ])
 
-dataset = ParquetDataset(train_parquet_file, transform, partitions=8)
+train_dataset = ParquetDataset(tensorstore_file_template, dataset_statistics, transform, "train")
+valid_dataset = ParquetDataset(tensorstore_file_template, dataset_statistics, transform, "valid")
 
-dataloader = DataLoader(
-    dataset,
-    batch_size=16,
+train_loader = DataLoader(
+    train_dataset,
+    batch_size=batch_size,
     shuffle=True,
+    pin_memory=False,
+    num_workers=0
+)
+
+valid_loader = DataLoader(
+    valid_dataset,
+    batch_size=batch_size,
+    shuffle=False,
     pin_memory=False,
     num_workers=0
 )
@@ -49,8 +59,8 @@ dataloader = DataLoader(
 config = ConvNextV2Config()
 model = ConvNextV2ForMultiLabelClassification(
     config,
-    output_size=768,
-    vocab_size=tag_indices_file["vocab_size"],
+    output_size=config.hidden_sizes[-1],
+    vocab_size=tag_indices["vocab_size"],
     use_sigmoid=False
 )
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
@@ -60,7 +70,7 @@ fabric = L.Fabric(accelerator="cuda", devices=1, strategy="fsdp")
 fabric.launch()
 
 model, optimizer = fabric.setup(model, optimizer)
-dataloader = fabric.setup_dataloaders(dataloader)
+dataloader = fabric.setup_dataloaders(train_loader)
 
 model.train()
 for epoch in tqdm(range(num_epochs)):

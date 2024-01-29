@@ -164,6 +164,8 @@ data/*
 !data/parameters.py
 bazel/
 final_processing.py
+pyproject.toml
+poetry.lock
 *.ipynb
 *.txt
 *.whl

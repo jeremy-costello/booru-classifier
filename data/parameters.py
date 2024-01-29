@@ -4,7 +4,6 @@ PARAMETER_DICT = {
     "large_files": {
         "database_file": "booru.db",
         "image_save_root": "images",
-        "parquet_file_template": "{split}.parquet",
         "tensorstore_file_template": "{data_type}_store_{split}.ts",
     },
     "small_file_root": "./data",
