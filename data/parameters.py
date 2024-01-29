@@ -52,4 +52,7 @@ def build_parameter_dict():
         for key, value in PARAMETER_DICT[f"{file_type}s"].items():
             parameter_dict[key] = f"{root}/{value}"
     
+    parameter_dict["tensorstore_file_template"] = \
+        parameter_dict["tensorstore_file_template"].lstrip(".").strip("/")
+    
     return parameter_dict

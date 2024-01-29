@@ -16,7 +16,7 @@ database_file = parameter_dict["database_file"]
 image_save_root = parameter_dict["image_save_root"]
 tag_indices_file = parameter_dict["tag_indices_json"]
 skeleton_parquet = parameter_dict["skeleton_parquet_file"]
-tensorstore_file_template = parameter_dict["tensorstore_file_template"].lstrip(".").strip("/")
+tensorstore_file_template = parameter_dict["tensorstore_file_template"]
 dataset_statistics_json = parameter_dict["dataset_statistics_json"]
 
 validation_fraction = parameter_dict["dataset"]["validation_fraction"]
@@ -98,21 +98,18 @@ total_rows = len(ddf)
 if load_tensorstores:
     def create_tensorstore(tensorstore_file, dimensions, dtype):
         return ts.open({
-            "driver": "n5",
+            "driver": "zarr",
             "kvstore": {
                 "driver": "file",
                 "path": tensorstore_file
             },
-            "metadata": {
-                "compression": {
-                    "type": "gzip"
-                },
-                "dataType": dtype,
-                "dimensions": dimensions,
-                "blockSize": [1] + dimensions[1:]
-            },
             "create": True,
-            "delete_existing": True
+            "delete_existing": True,
+            "dtype": dtype,
+            "metadata": {
+                "shape": dimensions,
+                "chunks": [1] + dimensions[1:]
+            }
         }).result()
 
     
@@ -129,8 +126,8 @@ if load_tensorstores:
     }
     
     dtypes = {
-        "image": "uint8",
-        "tags": "int64"
+        "image": ts.uint8,
+        "tags": ts.int64
     }
     
     tensorstores = dict()

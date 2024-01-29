@@ -1,7 +1,7 @@
 import json
 import torch
 import numpy as np
-import dask.dataframe as dd
+import tensorstore as ts
 import matplotlib.pyplot as plt
 import torchvision.transforms.v2 as transforms
 from torch.utils.data import Dataset, DataLoader
@@ -49,14 +49,28 @@ def main():
             axes[i].axis("off")
             axes[i].set_title(f"Image {i+1}")
 
-        plt.show()
+        plt.savefig("./data/plotted_images.png")
         break
+
+
+def open_tensorstore(tensorstore_file):
+    return ts.open({
+        "driver": "zarr",
+        "kvstore": {
+            "driver": "file",
+            "path": tensorstore_file
+        }
+    }).result()
 
 
 class ParquetDataset(Dataset):
     def __init__(self, tensorstore_file_template, dataset_statistics, transform, split):
-        self.image_tensorstore = tensorstore_file_template.format(split=split, data_type="image")
-        self.tags_tensorstore = tensorstore_file_template.format(split=split, data_type="tags")
+        self.image_tensorstore = open_tensorstore(
+            tensorstore_file_template.format(split=split, data_type="image")
+        )
+        self.tags_tensorstore = open_tensorstore(
+            tensorstore_file_template.format(split=split, data_type="tags")
+        )
         
         self.total_samples = dataset_statistics["count"][split]
         
@@ -66,8 +80,10 @@ class ParquetDataset(Dataset):
         return self.total_samples
     
     def __getitem__(self, idx):
-        image = self.image_tensorstore[idx, :, :, :]
-        tags = self.tags_tensorstore[idx, :]
+        image = self.image_tensorstore[idx, :, :, :].read().result()
+        image = self.transform(image)
+        
+        tags = self.tags_tensorstore[idx, :].read().result()
 
         return {
             "images": image,
