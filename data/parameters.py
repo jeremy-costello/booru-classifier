@@ -33,7 +33,8 @@ PARAMETER_DICT = {
     },
     "training": {
         "num_epochs": 10,
-        "learning_rate": 3e-4
+        "learning_rate": 3e-4,
+        "batch_size": 16
     }
 }
 

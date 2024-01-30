@@ -13,11 +13,11 @@
 version: 1
 metadata:
   content_hash:
-    linux-64: 3814bb823c24a7e0e23dd9e8a3d2bb761e93980746981b9413e11787eed2d2ba
+    linux-64: 170986b054ceb70e4a2c5c266c1793ef7826f469f1f662a71ae411f06c9be32e
   channels:
-  - url: pytorch
-    used_env_vars: []
   - url: nvidia
+    used_env_vars: []
+  - url: pytorch
     used_env_vars: []
   - url: conda-forge
     used_env_vars: []
@@ -661,6 +661,33 @@ package:
     sha256: b9521f5fe75ec73b2be9227abd6d27e51d7d2698c614f46d4977e7135b003bef
   category: main
   optional: false
+- name: datasets
+  version: 2.16.1
+  manager: conda
+  platform: linux-64
+  dependencies:
+    aiohttp: ''
+    dill: '>=0.3.0,<0.3.8'
+    fsspec: '>=2023.1.0,<=2023.10.0'
+    huggingface_hub: '>=0.19.4'
+    importlib-metadata: ''
+    multiprocess: ''
+    numpy: '>=1.17'
+    packaging: ''
+    pandas: ''
+    pyarrow: '>=8.0.0'
+    pyarrow-hotfix: ''
+    python: '>=3.8.0'
+    python-xxhash: ''
+    pyyaml: '>=5.1'
+    requests: '>=2.19.0'
+    tqdm: '>=4.62.1'
+  url: https://conda.anaconda.org/conda-forge/noarch/datasets-2.16.1-pyhd8ed1ab_0.conda
+  hash:
+    md5: 99516e8430074c50911e058326eaa450
+    sha256: ce835aeba2a2e987d6c5da996cf60d5d82a583ea903c410640382b45a00bbe43
+  category: main
+  optional: false
 - name: dav1d
   version: 1.2.1
   manager: conda
@@ -671,6 +698,18 @@ package:
   hash:
     md5: 418c6ca5929a611cbd69204907a83995
     sha256: 22053a5842ca8ee1cf8e1a817138cdb5e647eb2c46979f84153f6ad7bde73020
+  category: main
+  optional: false
+- name: dill
+  version: 0.3.7
+  manager: conda
+  platform: linux-64
+  dependencies:
+    python: '>=3.7'
+  url: https://conda.anaconda.org/conda-forge/noarch/dill-0.3.7-pyhd8ed1ab_0.conda
+  hash:
+    md5: 5e4f3466526c52bc9af2d2353a1460bd
+    sha256: 4ff20c6be028be2825235631c45d9e4a75bca1de65f8840c02dfb28ea0137c45
   category: main
   optional: false
 - name: distributed
@@ -763,15 +802,15 @@ package:
   category: main
   optional: false
 - name: fsspec
-  version: 2023.12.2
+  version: 2023.10.0
   manager: conda
   platform: linux-64
   dependencies:
     python: '>=3.8'
-  url: https://conda.anaconda.org/conda-forge/noarch/fsspec-2023.12.2-pyhca7485f_0.conda
+  url: https://conda.anaconda.org/conda-forge/noarch/fsspec-2023.10.0-pyhca7485f_0.conda
   hash:
-    md5: bf40f2a8835b78b1f91083d306b493d2
-    sha256: 9269a5464698e0fde1f9c78544552817370c26df86e2a5a7518544b6a55ae8ee
+    md5: 5b86cf1ceaaa9be2ec4627377e538db1
+    sha256: 1bbdfadb93cc768252fd207dca406cde928f9a81ff985ea1760b6539c55923e6
   category: main
   optional: false
 - name: gflags
@@ -843,6 +882,25 @@ package:
   hash:
     md5: 7d1b6fff16c1431d96cb4934938799fd
     sha256: 6c9307f0fedce2c4d060bba9ac888b300bc0912effab423d67b8e1b661a93305
+  category: main
+  optional: false
+- name: huggingface_hub
+  version: 0.20.2
+  manager: conda
+  platform: linux-64
+  dependencies:
+    filelock: ''
+    fsspec: '>=2023.5.0'
+    packaging: '>=20.9'
+    python: '>=3.8'
+    pyyaml: '>=5.1'
+    requests: ''
+    tqdm: '>=4.42.1'
+    typing-extensions: '>=3.7.4.3'
+  url: https://conda.anaconda.org/conda-forge/noarch/huggingface_hub-0.20.2-pyhd8ed1ab_0.conda
+  hash:
+    md5: 3f4e4c828523dcac4829d7362b60ef8f
+    sha256: 3d036f2cf10e8bea177514b667a21912774d339aa8403b85c6883b61ca041e09
   category: main
   optional: false
 - name: icu
@@ -1804,6 +1862,42 @@ package:
     sha256: 370c7c5893b737596fd6ca0d9190c9715d89d888b8c88537ae1ef168c25e82e4
   category: main
   optional: false
+- name: lightning
+  version: 2.1.3
+  manager: conda
+  platform: linux-64
+  dependencies:
+    fsspec: <2025.0,>=2022.5.0
+    lightning-utilities: <2.0,>=0.8.0
+    numpy: <3.0,>=1.17.2
+    packaging: <25.0,>=20.0
+    python: '>=3.8'
+    pytorch: <4.0,>=1.12.0
+    pytorch-lightning: ''
+    pyyaml: <8.0,>=5.4
+    torchmetrics: <3.0,>=0.7.0
+    tqdm: <6.0,>=4.57.0
+    typing-extensions: <6.0,>=4.0.0
+  url: https://conda.anaconda.org/conda-forge/noarch/lightning-2.1.3-pyhd8ed1ab_1.conda
+  hash:
+    md5: 83981dbe26658cb2d811da69958a6d07
+    sha256: b9022a7d95273d3c80932caf58f2f83d0aaed9de63d426e1ac53c07861a3255d
+  category: main
+  optional: false
+- name: lightning-utilities
+  version: 0.10.1
+  manager: conda
+  platform: linux-64
+  dependencies:
+    packaging: '>=17.1'
+    python: '>=3.8'
+    typing_extensions: ''
+  url: https://conda.anaconda.org/conda-forge/noarch/lightning-utilities-0.10.1-pyhd8ed1ab_0.conda
+  hash:
+    md5: 4132ed16f8074bc111d477c52508fda4
+    sha256: 3f9505c0cd1b84e0aae8354adcada75cb0f1af09b1005d3168280a6d3c2b74ba
+  category: main
+  optional: false
 - name: llvm-openmp
   version: 15.0.7
   manager: conda
@@ -1966,6 +2060,21 @@ package:
   hash:
     md5: 3dc76316237c8f7e7231d61b76c62b7c
     sha256: 5bb152aab8fa22d68ce0c802a9990c406eb60a8041660071de0bd30a5cd5081c
+  category: main
+  optional: false
+- name: multiprocess
+  version: 0.70.15
+  manager: conda
+  platform: linux-64
+  dependencies:
+    dill: '>=0.3.6'
+    libgcc-ng: '>=12'
+    python: '>=3.11,<3.12.0a0'
+    python_abi: 3.11.*
+  url: https://conda.anaconda.org/conda-forge/linux-64/multiprocess-0.70.15-py311h459d7ec_1.conda
+  hash:
+    md5: cebd02a02b199549a57e0d70aed7e2dc
+    sha256: eca27e6fb5fb4ee73f04ae030bce29f5daa46fea3d6abdabb91740646f0d188e
   category: main
   optional: false
 - name: ncurses
@@ -2290,6 +2399,21 @@ package:
     sha256: d2381037bf362c78654a8ece0e0f54715e09113448ddd7ed837f688536cbf176
   category: main
   optional: false
+- name: python-xxhash
+  version: 3.4.1
+  manager: conda
+  platform: linux-64
+  dependencies:
+    libgcc-ng: '>=12'
+    python: '>=3.11,<3.12.0a0'
+    python_abi: 3.11.*
+    xxhash: '>=0.8.2,<0.8.3.0a0'
+  url: https://conda.anaconda.org/conda-forge/linux-64/python-xxhash-3.4.1-py311h459d7ec_0.conda
+  hash:
+    md5: 60b5332b3989fda37884b92c7afd6a91
+    sha256: 91293b2ca0f36ac580f2be4b9c0858cdaec52eff95473841231dcd044acd2e12
+  category: main
+  optional: false
 - name: python_abi
   version: '3.11'
   manager: conda
@@ -2347,6 +2471,29 @@ package:
   hash:
     md5: ffc0937cf6ba3ffb299b0c256accc53f
     sha256: 912c544df4e7abd8510e572bc50cd11c6fa880273858a057fc451563f04d3cf6
+  category: main
+  optional: false
+- name: pytorch-lightning
+  version: 2.1.3
+  manager: conda
+  platform: linux-64
+  dependencies:
+    fsspec: '>=2022.5.0'
+    lightning-utilities: '>=0.8.0'
+    numpy: '>=1.17.2'
+    packaging: '>=20.0'
+    python: '>=3.8'
+    pytorch: '>=1.12.0'
+    pyyaml: '>=5.4'
+    requests: ''
+    torchmetrics: '>=0.7.0'
+    tqdm: '>=4.57.0'
+    typing-extensions: '>=4.0.0'
+    typing_extensions: '>=4.0.0'
+  url: https://conda.anaconda.org/conda-forge/noarch/pytorch-lightning-2.1.3-pyhd8ed1ab_0.conda
+  hash:
+    md5: 6cb9d53de00b53b4ec5722c96023e43d
+    sha256: 47fbd62a00fe98eee309b4b3ab88ddd8b48005032b19fe03fb3d1cca1503840f
   category: main
   optional: false
 - name: pytorch-mutex
@@ -2439,6 +2586,20 @@ package:
     sha256: 5435cf39d039387fbdc977b0a762357ea909a7694d9528ab40f005e9208744d7
   category: main
   optional: false
+- name: regex
+  version: 2023.12.25
+  manager: conda
+  platform: linux-64
+  dependencies:
+    libgcc-ng: '>=12'
+    python: '>=3.11,<3.12.0a0'
+    python_abi: 3.11.*
+  url: https://conda.anaconda.org/conda-forge/linux-64/regex-2023.12.25-py311h459d7ec_0.conda
+  hash:
+    md5: 90c12714214e3028d32a19d31af30744
+    sha256: 30791fca4461b858bbf4058eba60cc151c38fbd4f883dea72d1d1c5ee4c1ef0a
+  category: main
+  optional: false
 - name: requests
   version: 2.31.0
   manager: conda
@@ -2466,6 +2627,32 @@ package:
   hash:
     md5: 54ae57d17d038b6a7aa7fdb55350d338
     sha256: 6f21a270e5fcf824d71b637ea26e389e469b3dc44a7e51062c27556c6e771b37
+  category: main
+  optional: false
+- name: safetensors
+  version: 0.3.3
+  manager: conda
+  platform: linux-64
+  dependencies:
+    libgcc-ng: '>=12'
+    python: '>=3.11,<3.12.0a0'
+    python_abi: 3.11.*
+  url: https://conda.anaconda.org/conda-forge/linux-64/safetensors-0.3.3-py311h46250e7_1.conda
+  hash:
+    md5: 1a1f04191eccfce868e8629e981aec6d
+    sha256: 02b16dea74388db9d1a58ad83c758d8dbd1b8c58c148ca247724baa3fad33962
+  category: main
+  optional: false
+- name: setuptools
+  version: 69.0.3
+  manager: conda
+  platform: linux-64
+  dependencies:
+    python: '>=3.7'
+  url: https://conda.anaconda.org/conda-forge/noarch/setuptools-69.0.3-pyhd8ed1ab_0.conda
+  hash:
+    md5: 40695fdfd15a92121ed2922900d0308b
+    sha256: 0fe2a0473ad03dac6c7f5c42ef36a8e90673c88a0350dfefdea4b08d43803db2
   category: main
   optional: false
 - name: six
@@ -2612,6 +2799,23 @@ package:
     sha256: e0569c9caa68bf476bead1bed3d79650bb080b532c64a4af7d8ca286c08dea4e
   category: main
   optional: false
+- name: tokenizers
+  version: 0.15.1
+  manager: conda
+  platform: linux-64
+  dependencies:
+    huggingface_hub: '>=0.16.4,<1.0'
+    libgcc-ng: '>=12'
+    libstdcxx-ng: '>=12'
+    openssl: '>=3.2.0,<4.0a0'
+    python: '>=3.11,<3.12.0a0'
+    python_abi: 3.11.*
+  url: https://conda.anaconda.org/conda-forge/linux-64/tokenizers-0.15.1-py311h6640629_0.conda
+  hash:
+    md5: 89d1337b3808c5e749d7a9961e668ea6
+    sha256: 54bda3f39a8c85b15619ce0ae632242c58c3165d3bca62c76ed9c94cfa70f3bf
+  category: main
+  optional: false
 - name: toolz
   version: 0.12.1
   manager: conda
@@ -2622,6 +2826,23 @@ package:
   hash:
     md5: 2fcb582444635e2c402e8569bb94e039
     sha256: 22b0a9790317526e08609d5dfdd828210ae89e6d444a9e954855fc29012e90c6
+  category: main
+  optional: false
+- name: torchmetrics
+  version: 1.2.1
+  manager: conda
+  platform: linux-64
+  dependencies:
+    lightning-utilities: '>=0.8.0'
+    numpy: '>1.20.0'
+    packaging: '>17.1'
+    python: '>=3.7'
+    pytorch: '>=1.8.1'
+    setuptools: ''
+  url: https://conda.anaconda.org/conda-forge/noarch/torchmetrics-1.2.1-pyhd8ed1ab_0.conda
+  hash:
+    md5: f6468e9ea893241ad7b8eae519f7e3a5
+    sha256: 26abe526d9514f096f196628ede28fb10d8e65cc19350b3be19f7bc465a22cec
   category: main
   optional: false
 - name: torchtriton
@@ -2684,6 +2905,40 @@ package:
   hash:
     md5: 03c97908b976498dcae97eb4e4f3149c
     sha256: b61c9222af05e8c5ff27e4a4d2eb81870c21ffd7478346be3ef644b7a3759cc4
+  category: main
+  optional: false
+- name: transformers
+  version: 4.37.1
+  manager: conda
+  platform: linux-64
+  dependencies:
+    datasets: '!=2.5.0'
+    filelock: ''
+    huggingface_hub: '>=0.19.3,<1.0'
+    numpy: '>=1.17'
+    packaging: '>=20.0'
+    python: '>=3.8'
+    pyyaml: '>=5.1'
+    regex: '!=2019.12.17'
+    safetensors: '>=0.3.1'
+    tokenizers: '>=0.15,<0.19'
+    tqdm: '>=4.27'
+  url: https://conda.anaconda.org/conda-forge/noarch/transformers-4.37.1-pyhd8ed1ab_0.conda
+  hash:
+    md5: d6bbbcd1b5fe59b6d1292ff4b6735de7
+    sha256: e6217335063a8417e34ecfe9158c78dfea72b1a20a2ba13c26f08c3baab2bfa1
+  category: main
+  optional: false
+- name: typing-extensions
+  version: 4.9.0
+  manager: conda
+  platform: linux-64
+  dependencies:
+    typing_extensions: 4.9.0
+  url: https://conda.anaconda.org/conda-forge/noarch/typing-extensions-4.9.0-hd8ed1ab_0.conda
+  hash:
+    md5: c16524c1b7227dc80b36b4fa6f77cc86
+    sha256: d795c1eb1db4ea147f01ece74e5a504d7c2e8d5ee8c11ec987884967dd938f9c
   category: main
   optional: false
 - name: typing_extensions
@@ -2760,6 +3015,18 @@ package:
   hash:
     md5: be93aabceefa2fac576e971aef407908
     sha256: 4df7c5ee11b8686d3453e7f3f4aa20ceef441262b49860733066c52cfd0e4a77
+  category: main
+  optional: false
+- name: xxhash
+  version: 0.8.2
+  manager: conda
+  platform: linux-64
+  dependencies:
+    libgcc-ng: '>=12'
+  url: https://conda.anaconda.org/conda-forge/linux-64/xxhash-0.8.2-hd590300_0.conda
+  hash:
+    md5: f08fb5c89edfc4aadee1c81d4cfb1fa1
+    sha256: 6fe74a8fd84ab0dc25e4dc3e0c22388dd8accb212897a208b14fe5d4fbb8fc2f
   category: main
   optional: false
 - name: xyzservices

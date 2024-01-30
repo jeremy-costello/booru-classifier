@@ -13,4 +13,4 @@ RUN micromamba clean --all -y
 RUN rm conda-lock.yml
 COPY *.py ./
 
-ENTRYPOINT ["/bin/sh"]
+ENTRYPOINT ["/bin/bash"]

@@ -50,6 +50,7 @@ def main():
             axes[i].set_title(f"Image {i+1}")
 
         plt.savefig("./data/plotted_images.png")
+        plt.close()
         break
 
 
