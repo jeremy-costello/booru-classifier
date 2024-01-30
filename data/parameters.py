@@ -1,13 +1,10 @@
 PARAMETER_DICT = {
     "booru_url": "https://safebooru.org",
-    "large_file_root": "./data",
-    "large_files": {
+    "file_root": "./data",
+    "files": {
         "database_file": "booru.db",
         "image_save_root": "images",
         "tensorstore_file_template": "{data_type}_store_{split}.ts",
-    },
-    "small_file_root": "./data",
-    "small_files": {
         "skeleton_parquet_file": "skeleton.parquet",
         "tag_counts_json": "tag_counts.json",
         "tag_indices_json": "tag_indices.json",
@@ -47,12 +44,10 @@ def build_parameter_dict():
         "training": PARAMETER_DICT["training"]
     }
 
-    for file_type in ["large_file", "small_file"]:
-        root = PARAMETER_DICT[f"{file_type}_root"]
-
-        for key, value in PARAMETER_DICT[f"{file_type}s"].items():
-            parameter_dict[key] = f"{root}/{value}"
-    
+    file_root = PARAMETER_DICT["file_root"]
+    for key, value in PARAMETER_DICT["files"].items():
+        parameter_dict[key] = f"{file_root}/{value}"
+        
     parameter_dict["tensorstore_file_template"] = \
         parameter_dict["tensorstore_file_template"].lstrip(".").strip("/")
     
