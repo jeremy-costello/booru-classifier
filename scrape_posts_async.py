@@ -203,7 +203,7 @@ async def get_all_posts():
     if debug:
         full_tag_list = full_tag_list[:50]
     
-    for it, tag in tqdm(enumerate(full_tag_list)):
+    for it, tag in enumerate(tqdm(full_tag_list)):
         cursor.execute("SELECT EXISTS (SELECT 1 FROM completed_tags WHERE tag_name = ?)", (tag,))
         tag_completed = cursor.fetchone()[0]
         if not tag_completed:

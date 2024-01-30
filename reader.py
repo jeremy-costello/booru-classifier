@@ -85,6 +85,7 @@ class TensorStoreDataset(Dataset):
         image = self.transform(image)
         
         tags = self.tags_tensorstore[idx, :].read().result()
+        tags = torch.tensor(tags, dtype=torch.float32)
 
         return {
             "images": image,
