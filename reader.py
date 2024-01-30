@@ -27,7 +27,7 @@ def main():
         transforms.Normalize(mean=dataset_statistics["mean"], std=dataset_statistics["std"]),
     ])
 
-    train_dataset = ParquetDataset(tensorstore_file_template, dataset_statistics, transform, split="train")
+    train_dataset = TensorStoreDataset(tensorstore_file_template, dataset_statistics, transform, split="train")
 
     train_loader = DataLoader(
         train_dataset,
@@ -64,7 +64,7 @@ def open_tensorstore(tensorstore_file):
     }).result()
 
 
-class ParquetDataset(Dataset):
+class TensorStoreDataset(Dataset):
     def __init__(self, tensorstore_file_template, dataset_statistics, transform, split):
         self.image_tensorstore = open_tensorstore(
             tensorstore_file_template.format(split=split, data_type="image")

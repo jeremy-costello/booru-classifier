@@ -14,10 +14,10 @@ dependencies:
   - pandas=2.2
   - pillow=10.2
   - pyarrow>=14.0,<16
-  - pytorch=2.1
+  - pytorch=2.2
   - pytorch-cuda=12.1
   - tensorstore=0.1
-  - torchvision>=0.16,<0.18
+  - torchvision=0.17
   - tqdm=4
   - transformers=4.37
 platforms:

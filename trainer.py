@@ -7,7 +7,7 @@ from transformers import ConvNextV2Config
 from torchvision.ops import sigmoid_focal_loss
 import torchvision.transforms.v2 as transforms
 
-from reader import ParquetDataset
+from reader import TensorStoreDataset
 from data.parameters import build_parameter_dict
 from model import ConvNextV2ForMultiLabelClassification
 
@@ -29,7 +29,7 @@ with open(dataset_statistics_file, 'r') as f:
 with open(tag_indices_file, 'r') as f:
     tag_indices = json.load(f)
 
-transform = transforms.Compose([
+train_transform = transforms.Compose([
     transforms.ToImage(),
     transforms.RandomHorizontalFlip(),
     transforms.TrivialAugmentWide(),
@@ -37,8 +37,14 @@ transform = transforms.Compose([
     transforms.Normalize(mean=dataset_statistics["mean"], std=dataset_statistics["std"]),
 ])
 
-train_dataset = ParquetDataset(tensorstore_file_template, dataset_statistics, transform, "train")
-valid_dataset = ParquetDataset(tensorstore_file_template, dataset_statistics, transform, "valid")
+valid_transform = transforms.Compose([
+    transforms.ToImage(),
+    transforms.ToDtype(torch.float32, scale=True),
+    transforms.Normalize(mean=dataset_statistics["mean"], std=dataset_statistics["std"]),
+])
+
+train_dataset = TensorStoreDataset(tensorstore_file_template, dataset_statistics, train_transform, "train")
+valid_dataset = TensorStoreDataset(tensorstore_file_template, dataset_statistics, valid_transform, "valid")
 
 train_loader = DataLoader(
     train_dataset,
