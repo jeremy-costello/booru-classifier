@@ -1,5 +1,6 @@
 import os
 import json
+import shutil
 import sqlite3
 import numpy as np
 from tqdm import tqdm
@@ -51,6 +52,7 @@ def image_and_tags(id_, tags, file_extension):
             return None
         
         try:
+            image = image.convert("RGBA")
             image = image.convert("RGB")
             image = image.resize((image_size, image_size))
         except OSError:
@@ -94,50 +96,69 @@ full_skeleton_url = f"file://{os.getcwd()}/{skeleton_url}"
 ddf = dd.read_parquet(full_skeleton_url)
 
 total_rows = len(ddf)
+validation_set = set(ddf["id"].sample(frac=validation_fraction).compute())
 
 if load_tensorstores:
-    def create_tensorstore(tensorstore_file, dimensions, dtype):
-        return ts.open({
-            "driver": "zarr",
-            "kvstore": {
-                "driver": "file",
-                "path": tensorstore_file
-            },
-            "create": True,
-            "delete_existing": True,
-            "dtype": dtype,
-            "metadata": {
-                "shape": dimensions,
-                "chunks": [1] + dimensions[1:]
+    class TensorStoreCreator:
+        def __init__(self, root, total_rows, validation_rows,
+                     image_size, channel_size, vocab_size):
+            self.root = root
+            
+            self.rows = {
+                "train": total_rows - validation_rows,
+                "valid": validation_rows
             }
-        }).result()
-
+            
+            self.data_size = {
+                "image": [image_size, image_size, channel_size],
+                "tags": [vocab_size]
+            }
+            
+            self.dtypes = {
+                "image": ts.uint8,
+                "tags": ts.int64
+            }
     
-    validation_set = set(ddf["id"].sample(frac=validation_fraction).compute())
-    print(len(validation_set))
+        def open_tensorstore(self, tensorstore_file, dimensions, dtype):
+            return ts.open({
+                "driver": "zarr",
+                "kvstore": {
+                    "driver": "file",
+                    "path": tensorstore_file
+                },
+                "create": True,
+                "delete_existing": True,
+                "dtype": dtype,
+                "metadata": {
+                    "shape": dimensions,
+                    "chunks": [1] + dimensions[1:]
+                }
+            }).result()            
     
-    rows = dict()
-    rows["valid"] = len(validation_set)
-    rows["train"] = total_rows - rows["valid"]
+        def create_tensorstores(self):
+            tensorstores = dict()
+            for split in ["train", "valid"]:
+                tensorstores[split] = dict()
+                for data_class in ["image", "tags"]:
+                    tensorstore_file = tensorstore_file_template.format(root=self.root, split=split, data_class=data_class)
+                    dimensions = [self.rows[split]] + self.data_size[data_class]
+                    dtype = self.dtypes[data_class]
+                    tensorstores[split][data_class] = self.open_tensorstore(tensorstore_file, dimensions, dtype)
+            return tensorstores
     
-    data_size = {
-        "image": [image_size, image_size, channel_size],
-        "tags": [vocab_size]
-    }
     
-    dtypes = {
-        "image": ts.uint8,
-        "tags": ts.int64
-    }
+    temp_root = "temp"
+    if not os.path.exists(temp_root):
+        os.mkdir(temp_root)
     
-    tensorstores = dict()
-    for split in ["train", "valid"]:
-        tensorstores[split] = dict()
-        for data_type in ["image", "tags"]:
-            tensorstore_file = tensorstore_file_template.format(split=split, data_type=data_type)
-            dimensions = [rows[split]] + data_size[data_type]
-            dtype = dtypes[data_type]
-            tensorstores[split][data_type] = create_tensorstore(tensorstore_file, dimensions, dtype)
+    tensorstore_creator = TensorStoreCreator(
+        root=temp_root,
+        total_rows=total_rows,
+        validation_rows=len(validation_set),
+        image_size=image_size,
+        channel_size=channel_size,
+        vocab_size=vocab_size
+    )
 
 ddf["chunk"] = ddf["id"] % chunks
 
@@ -158,6 +179,9 @@ for chunk in tqdm(range(chunks)):
     chunked_ddf = chunked_ddf.reset_index(drop=True)
     chunked_ddf.columns = ["id", "image_array", "image_mean", "image_std", "tags_array"]
     
+    if load_tensorstores:
+        tensorstores = tensorstore_creator.create_tensorstores()
+    
     for index, row in tqdm(chunked_ddf.iterrows(), total=len(chunked_ddf), leave=False):
         if row.id not in validation_set:
             split = "train"
@@ -166,10 +190,25 @@ for chunk in tqdm(range(chunks)):
         else:
             split = "valid"
         
-        tensorstores[split]["image"][dataset_stats["count"][split], :, :, :].write(row.image_array).result()
-        tensorstores[split]["tags"][dataset_stats["count"][split], :].write(row.tags_array).result()
+        if load_tensorstores:
+            tensorstores[split]["image"][dataset_stats["count"][split], :, :, :].write(row.image_array).result()
+            tensorstores[split]["tags"][dataset_stats["count"][split], :].write(row.tags_array).result()
         
         dataset_stats["count"][split] += 1
+    
+    if load_tensorstores:
+        for split in ["train", "valid"]:
+            for data_class in ["image", "tags"]:
+                original_file = tensorstore_file_template.format(root="temp", split=split, data_class=data_class)
+                destination_file = tensorstore_file_template.format(root="data", split=split, data_class=data_class)
+                
+                if not os.path.exists(destination_file):
+                    os.mkdir(destination_file)
+                
+                shutil.copytree(original_file, destination_file, dirs_exist_ok=True)
+
+if load_tensorstores:
+    shutil.rmtree(temp_root)
 
 print(dataset_stats["count"])
 

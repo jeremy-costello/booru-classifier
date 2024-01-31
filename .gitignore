@@ -163,6 +163,7 @@ cython_debug/
 data/*
 !data/parameters.py
 bazel/
+backup/
 final_processing.py
 pyproject.toml
 poetry.lock

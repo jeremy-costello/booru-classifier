@@ -21,6 +21,7 @@ image_save_root = parameter_dict["image_save_root"]
 batch_size = parameter_dict["scraping"]["image_batch_size"]
 max_retries = parameter_dict["scraping"]["max_retries"]
 debug = parameter_dict["scraping"]["debug"]
+download_type = parameter_dict["scraping"]["download_type"]
 
 
 def create_tables(cursor):
@@ -133,7 +134,6 @@ async def download_image_batch(post_id_batch, file_url_batch, file_extension_bat
 
 
 async def download_all_images():
-    download_type = "posts"
     save_root = Path(image_save_root)
     save_root.mkdir(parents=True, exist_ok=True)
 
@@ -162,7 +162,7 @@ async def download_all_images():
         if download_type == "posts":
             query = "SELECT id, file_url, file_extension FROM posts LIMIT ? OFFSET ?"
         elif download_type == "timeouts":
-            query = "SELECT id, file_url, file_extension FROM images WHERE timeout = 1 LIMIT ? OFFSET ?"
+            query = "SELECT id, file_url, extension FROM images WHERE timeout = 1 LIMIT ? OFFSET ?"
         else:
             download_type_else()
         

@@ -1,10 +1,10 @@
 PARAMETER_DICT = {
     "booru_url": "https://safebooru.org",
     "file_root": "./data",
+    "tensorstore_file_template": "{root}/{data_class}_store_{split}.ts",
     "files": {
         "database_file": "booru.db",
         "image_save_root": "images",
-        "tensorstore_file_template": "{data_type}_store_{split}.ts",
         "skeleton_parquet_file": "skeleton.parquet",
         "tag_counts_json": "tag_counts.json",
         "tag_indices_json": "tag_indices.json",
@@ -16,6 +16,7 @@ PARAMETER_DICT = {
         "post_min_batch_size": 8192,
         "image_batch_size": 8192,
         "tag_batch_size": 512,
+        "download_type": "posts"
     },
     "dataset": {
         "skeleton_partitions": 32,
@@ -24,7 +25,7 @@ PARAMETER_DICT = {
         "validation_fraction": 0.05,
         "image_size": 224,
         "channel_size": 3,
-        "final_chunks": 10,
+        "final_chunks": 64,
         "stats_rounding": 4,
         "load_tensorstores": True
     },
@@ -39,6 +40,7 @@ PARAMETER_DICT = {
 def build_parameter_dict():
     parameter_dict = {
         "booru_url": PARAMETER_DICT["booru_url"],
+        "tensorstore_file_template": PARAMETER_DICT["tensorstore_file_template"],
         "scraping": PARAMETER_DICT["scraping"],
         "dataset": PARAMETER_DICT["dataset"],
         "training": PARAMETER_DICT["training"]
@@ -48,7 +50,4 @@ def build_parameter_dict():
     for key, value in PARAMETER_DICT["files"].items():
         parameter_dict[key] = f"{file_root}/{value}"
         
-    parameter_dict["tensorstore_file_template"] = \
-        parameter_dict["tensorstore_file_template"].lstrip(".").strip("/")
-    
     return parameter_dict

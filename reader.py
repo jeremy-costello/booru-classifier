@@ -67,10 +67,10 @@ def open_tensorstore(tensorstore_file):
 class TensorStoreDataset(Dataset):
     def __init__(self, tensorstore_file_template, dataset_statistics, transform, split):
         self.image_tensorstore = open_tensorstore(
-            tensorstore_file_template.format(split=split, data_type="image")
+            tensorstore_file_template.format(root="data", split=split, data_class="image")
         )
         self.tags_tensorstore = open_tensorstore(
-            tensorstore_file_template.format(split=split, data_type="tags")
+            tensorstore_file_template.format(root="data", split=split, data_class="tags")
         )
         
         self.total_samples = dataset_statistics["count"][split]
