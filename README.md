@@ -12,7 +12,7 @@ Download tagged images from any booru with similar structure to [safebooru](http
 - run ```scrape_images_async.py``` to scrape images from posts.
 - run ```downloaded_tags.py``` to get tags from downloaded images.
 - run ```dataset_skeleton.py``` to get tag data jsons and create Dask DF of image data.
-- run ```dataset_final_tensorstore.py``` to store image arrays in a [tensorstore](https://google.github.io/tensorstore/).
+- run ```dataset_final_tensorstore_temp.py``` to store image and tag arrays in [tensorstores](https://google.github.io/tensorstore/).
 - run ```reader.py``` to test the pytorch dataset is working (saves a sample on the persistent volume as ```plotted_images.png```).
 - run ```trainer.py``` for a basic training loop.
 
