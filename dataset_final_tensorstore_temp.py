@@ -182,7 +182,8 @@ for chunk in tqdm(range(chunks)):
     if load_tensorstores:
         tensorstores = tensorstore_creator.create_tensorstores()
     
-    for index, row in tqdm(chunked_ddf.iterrows(), total=len(chunked_ddf), leave=False):
+    total_rows = len(chunked_ddf)
+    for index, row in tqdm(chunked_ddf.iterrows(), total=total_rows, leave=False):
         if row.id not in validation_set:
             split = "train"
             dataset_stats["mean"] += row.image_mean

@@ -25,7 +25,7 @@ PARAMETER_DICT = {
         "validation_fraction": 0.05,
         "image_size": 224,
         "channel_size": 3,
-        "final_chunks": 64,
+        "final_chunks": 256,
         "stats_rounding": 4,
         "load_tensorstores": True
     },
