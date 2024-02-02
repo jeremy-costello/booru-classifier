@@ -16,7 +16,7 @@ parameter_dict = build_parameter_dict()
 
 # data stuff
 deeplake_file_template = parameter_dict["deeplake_file_template"]
-matmul_precision = parameter_dict["training"]["matmul_precision"] 
+matmul_precision = parameter_dict["training"]["matmul_precision"]
 num_workers = parameter_dict["training"]["num_workers"]
 num_epochs = parameter_dict["training"]["num_epochs"]
 learning_rate = parameter_dict["training"]["learning_rate"]

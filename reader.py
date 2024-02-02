@@ -14,10 +14,15 @@ def main():
     parameter_dict = build_parameter_dict()
 
     deeplake_file_template = parameter_dict["deeplake_file_template"]
+    matmul_precision = parameter_dict["training"]["matmul_precision"]
+    num_workers = parameter_dict["training"]["num_workers"]
     dataset_statistics_file = parameter_dict["dataset_statistics_json"]
 
     with open(dataset_statistics_file, 'r') as f:
         dataset_statistics = json.load(f)
+    
+    if matmul_precision is not None:
+        torch.set_float32_matmul_precision(matmul_precision)
     
     # https://pytorch.org/vision/main/generated/torchvision.transforms.TrivialAugmentWide.html
     transform = transforms.Compose([
@@ -37,7 +42,7 @@ def main():
         train_dataset,
         sampler=train_sampler,
         pin_memory=False,
-        num_workers=0
+        num_workers=num_workers
     )
 
     train_loader = fabric.setup_dataloaders(train_loader, use_distributed_sampler=False)
