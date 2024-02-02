@@ -165,6 +165,7 @@ data/*
 bazel/
 backup/
 final_processing.py
+ts_test.py
 pyproject.toml
 poetry.lock
 *.ipynb

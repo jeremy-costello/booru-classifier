@@ -7,7 +7,7 @@ from transformers import ConvNextV2Config
 from torchvision.ops import sigmoid_focal_loss
 import torchvision.transforms.v2 as transforms
 
-from reader import TensorStoreDataset
+from custom_reader import ImageLoader
 from data.parameters import build_parameter_dict
 from model import ConvNextV2ForMultiLabelClassification
 
@@ -16,6 +16,9 @@ parameter_dict = build_parameter_dict()
 
 # data stuff
 tensorstore_file_template = parameter_dict["tensorstore_file_template"]
+matmul_precision = parameter_dict["training"]["matmul_precision"] 
+num_workers = parameter_dict["training"]["num_workers"]
+use_fabric = parameter_dict["training"]["use_fabric"]
 num_epochs = parameter_dict["training"]["num_epochs"]
 learning_rate = parameter_dict["training"]["learning_rate"]
 batch_size = parameter_dict["training"]["batch_size"]
@@ -43,6 +46,9 @@ valid_transform = transforms.Compose([
     transforms.Normalize(mean=dataset_statistics["mean"], std=dataset_statistics["std"]),
 ])
 
+if matmul_precision is not None:
+    torch.set_float32_matmul_precision(matmul_precision)
+
 train_dataset = TensorStoreDataset(tensorstore_file_template, dataset_statistics, train_transform, "train")
 valid_dataset = TensorStoreDataset(tensorstore_file_template, dataset_statistics, valid_transform, "valid")
 
@@ -51,7 +57,7 @@ train_loader = DataLoader(
     batch_size=batch_size,
     shuffle=True,
     pin_memory=False,
-    num_workers=0
+    num_workers=num_workers
 )
 
 valid_loader = DataLoader(
@@ -59,7 +65,7 @@ valid_loader = DataLoader(
     batch_size=batch_size,
     shuffle=False,
     pin_memory=False,
-    num_workers=0
+    num_workers=num_workers
 )
 
 config = ConvNextV2Config()
@@ -72,15 +78,16 @@ model = ConvNextV2ForMultiLabelClassification(
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 # loss_function = torch.nn.BCELoss()
 
-fabric = L.Fabric(accelerator="cuda", devices=1, strategy="fsdp")
-fabric.launch()
+if use_fabric:
+    fabric = L.Fabric(accelerator="cuda", devices=1, strategy="fsdp")
+    fabric.launch()
 
-model, optimizer = fabric.setup(model, optimizer)
-dataloader = fabric.setup_dataloaders(train_loader)
+    model, optimizer = fabric.setup(model, optimizer)
+    train_loader = fabric.setup_dataloaders(train_loader)
 
 model.train()
 for epoch in tqdm(range(num_epochs)):
-    for batch in tqdm(dataloader, leave=False):
+    for batch in tqdm(train_loader, leave=False):
         optimizer.zero_grad()
 
         images = batch["images"]
@@ -89,8 +96,11 @@ for epoch in tqdm(range(num_epochs)):
         output = model(images)
         loss = sigmoid_focal_loss(output, tags, reduction="sum")
         # precision, recall, F1, confusion matrix, accuracy, positive accuracy, negative accuracy
-
-        fabric.backward(loss)
+        
+        if use_fabric:
+            fabric.backward(loss)
+        else:
+            loss.backward()
         optimizer.step()
     
     print(loss)
