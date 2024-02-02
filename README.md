@@ -13,11 +13,11 @@ Download tagged images from any booru with similar structure to [safebooru](http
 - run ```downloaded_tags.py``` to get tags from downloaded images.
 - run ```dataset_skeleton.py``` to get tag data jsons and create Dask DF of image data.
 - run ```dataset_final_tensorstore_temp.py``` to store image and tag arrays in [tensorstores](https://google.github.io/tensorstore/).
-- run ```custom_reader.py``` to test the custom tensorstore dataset is working (saves a sample on the persistent volume as ```plotted_images.png```).
+- run ```reader.py``` to test the pytorch dataset is working (saves a sample on the persistent volume as ```plotted_images.png```).
 - run ```trainer.py``` for a basic training loop.
 
 # todo
 - tensorstore async (done for reading. still todo for writing)
-- figure out how to use my custom tensorstore dataloader with lightning fabric
+- dataloader only works with num_workers=0
 - finish training code
 - train a model
