@@ -1,7 +1,7 @@
 import json
 import torch
+import deeplake
 import lightning as L
-import tensorstore as ts
 from einops import rearrange
 import matplotlib.pyplot as plt
 import torchvision.transforms.v2 as transforms
@@ -13,7 +13,7 @@ from data.parameters import build_parameter_dict
 def main():
     parameter_dict = build_parameter_dict()
 
-    tensorstore_file_template = parameter_dict["tensorstore_file_template"]
+    deeplake_file_template = parameter_dict["deeplake_file_template"]
     dataset_statistics_file = parameter_dict["dataset_statistics_json"]
 
     with open(dataset_statistics_file, 'r') as f:
@@ -30,7 +30,7 @@ def main():
     fabric = L.Fabric(accelerator="cuda", devices=1, strategy="fsdp")
     fabric.launch()
     
-    train_dataset = TensorStoreDataset(tensorstore_file_template, dataset_statistics, transform, split="train")
+    train_dataset = DeepLakeDataset(deeplake_file_template, dataset_statistics, transform, split="train")
 
     train_sampler = BatchSampler(DistributedSampler(train_dataset, shuffle=True), batch_size=4, drop_last=True)
     train_loader = DataLoader(
@@ -59,47 +59,24 @@ def main():
         break
 
 
-def open_tensorstore(tensorstore_file, cache_limit):
-    return ts.open({
-        "driver": "zarr",
-        "kvstore": {
-            "driver": "file",
-            "path": tensorstore_file
-        },
-        "context": {
-            "cache_pool": {
-                "total_bytes_limit": cache_limit
-            }
-        },
-        "recheck_cached_data": "open"
-    }).result()
-
-
-class TensorStoreDataset(Dataset):
-    def __init__(self, tensorstore_file_template, dataset_statistics, transform, split):
-        self.image_tensorstore = open_tensorstore(
-            tensorstore_file_template.format(root="data", split=split, data_class="image"),
-            cache_limit=100_000_000
-        )
-        self.tags_tensorstore = open_tensorstore(
-            tensorstore_file_template.format(root="data", split=split, data_class="tags"),
-            cache_limit=100_000_000
-        )
+class DeepLakeDataset(Dataset):    
+    def __init__(self, deeplake_file_template, dataset_statistics, transform, split):
+        lake_path = deeplake_file_template.format(root="data", split=split)
+        self.lake = deeplake.dataset(lake_path, read_only=True)
         
         self.total_samples = dataset_statistics["count"][split]
-        
         self.transform = transform      
 
     def __len__(self):
         return self.total_samples
     
     def __getitem__(self, indices):
-        image_batch = self.image_tensorstore[indices, :, :, :].read().result()
+        image_batch = self.lake.images[indices, :, :, :].numpy()
         image_batch = torch.tensor(image_batch, dtype=torch.uint8)
         image_batch = rearrange(image_batch, "b h w c -> b c h w")
         image_batch = self.transform(image_batch)
         
-        tags_batch = self.tags_tensorstore[indices, :].read().result()
+        tags_batch = self.lake.tags[indices, :].numpy()
         tags_batch = torch.tensor(tags_batch, dtype=torch.float32)
 
         return {

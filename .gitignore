@@ -164,6 +164,7 @@ data/*
 !data/parameters.py
 bazel/
 backup/
+deeplake/
 final_processing.py
 ts_test.py
 pyproject.toml

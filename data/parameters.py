@@ -1,7 +1,7 @@
 PARAMETER_DICT = {
     "booru_url": "https://safebooru.org",
     "file_root": "./data",
-    "tensorstore_file_template": "{root}/{data_class}_store_{split}.ts",
+    "deeplake_file_template": "{root}/{split}_lake",
     "files": {
         "database_file": "booru.db",
         "image_save_root": "images",
@@ -27,7 +27,6 @@ PARAMETER_DICT = {
         "channel_size": 3,
         "final_chunks": 256,
         "stats_rounding": 4,
-        "load_tensorstores": True
     },
     "training": {
         "matmul_precision": None,
@@ -42,7 +41,7 @@ PARAMETER_DICT = {
 def build_parameter_dict():
     parameter_dict = {
         "booru_url": PARAMETER_DICT["booru_url"],
-        "tensorstore_file_template": PARAMETER_DICT["tensorstore_file_template"],
+        "deeplake_file_template": PARAMETER_DICT["deeplake_file_template"],
         "scraping": PARAMETER_DICT["scraping"],
         "dataset": PARAMETER_DICT["dataset"],
         "training": PARAMETER_DICT["training"]

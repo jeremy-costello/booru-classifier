@@ -7,7 +7,7 @@ from transformers import ConvNextV2Config
 from torchvision.ops import sigmoid_focal_loss
 import torchvision.transforms.v2 as transforms
 
-from reader import TensorStoreDataset
+from reader import DeepLakeDataset
 from data.parameters import build_parameter_dict
 from model import ConvNextV2ForMultiLabelClassification
 
@@ -15,7 +15,7 @@ from model import ConvNextV2ForMultiLabelClassification
 parameter_dict = build_parameter_dict()
 
 # data stuff
-tensorstore_file_template = parameter_dict["tensorstore_file_template"]
+deeplake_file_template = parameter_dict["deeplake_file_template"]
 matmul_precision = parameter_dict["training"]["matmul_precision"] 
 num_workers = parameter_dict["training"]["num_workers"]
 num_epochs = parameter_dict["training"]["num_epochs"]
@@ -49,8 +49,8 @@ valid_transform = transforms.Compose([
 fabric = L.Fabric(accelerator="cuda", devices=1, strategy="fsdp")
 fabric.launch()
 
-train_dataset = TensorStoreDataset(tensorstore_file_template, dataset_statistics, train_transform, "train")
-valid_dataset = TensorStoreDataset(tensorstore_file_template, dataset_statistics, valid_transform, "valid")
+train_dataset = DeepLakeDataset(deeplake_file_template, dataset_statistics, train_transform, "train")
+valid_dataset = DeepLakeDataset(deeplake_file_template, dataset_statistics, valid_transform, "valid")
 
 train_sampler = BatchSampler(DistributedSampler(train_dataset, shuffle=True), batch_size=batch_size, drop_last=True)
 valid_sampler = BatchSampler(DistributedSampler(valid_dataset, shuffle=False), batch_size=batch_size, drop_last=False)
@@ -86,7 +86,7 @@ train_loader = fabric.setup_dataloaders(train_loader, use_distributed_sampler=Fa
 model.train()
 for epoch in tqdm(range(num_epochs)):
     for batch in tqdm(train_loader, leave=False):
-        optimizer.zero_grad()
+        optimizer.zero_grad(set_to_none=True)
         
         images = batch["images"].squeeze(0)
         tags = batch["tags"].squeeze(0)
