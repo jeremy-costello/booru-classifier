@@ -9,7 +9,9 @@ dependencies:
   - aiohttp=3
   - beautifulsoup4=4
   - dask=2024.1
+  - einops=0.7
   - lightning=2.1
+  - matplotlib=3
   - numpy=1.26
   - pandas=2.2
   - pillow=10.2

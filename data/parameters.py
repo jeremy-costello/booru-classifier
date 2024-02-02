@@ -31,7 +31,6 @@ PARAMETER_DICT = {
     },
     "training": {
         "matmul_precision": None,
-        "num_workers": 0,
         "use_fabric": False,
         "num_epochs": 10,
         "learning_rate": 3e-4,
