@@ -18,6 +18,6 @@ Download tagged images from any booru with similar structure to [safebooru](http
 
 # todo
 - tensorstore async (done for reading. still todo for writing)
-- modify training code to use custom tensorstore dataloader
+- figure out how to use my custom tensorstore dataloader with lightning fabric
 - finish training code
 - train a model
