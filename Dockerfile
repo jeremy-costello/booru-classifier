@@ -7,7 +7,9 @@ COPY conda-lock.yml ./
 SHELL ["/bin/micromamba", "run", "-n", "base", "/bin/bash", "-c"]
 
 RUN micromamba install -f conda-lock.yml -y
-RUN python -m pip install deeplake=3.8
+RUN python -m pip install deeplake==3.8.*
+# torch_xla version should be the same as pytorch in conda-lock.yml
+RUN python -m pip install torch_xla[tpu]==2.2.0
 RUN micromamba clean --all -y
 
 RUN rm conda-lock.yml

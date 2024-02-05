@@ -30,10 +30,24 @@ PARAMETER_DICT = {
     },
     "training": {
         "matmul_precision": None,
+        "num_devices": 1,
+        "precision": "bf16-mixed",
+        "tpu": False,
         "num_workers": 0,
-        "num_epochs": 10,
+        "global_batch_size": 64,
+        "micro_batch_size": 16,
+        "num_epochs": 50,
+        "warmup_steps": 2000,
+        "log_step_interval": 10,
+        "save_step_interval": 10,
+        "eval_step_interval": 10,
         "learning_rate": 3e-4,
-        "batch_size": 16
+        "weight_decay": 0.01,
+        "beta1": 0.9,
+        "beta2": 0.999,
+        "grad_clip": 1.0,
+        "decay_lr": True,
+        "min_lr": 3e-5
     }
 }
 

@@ -15,6 +15,7 @@ dependencies:
   - numpy=1.26
   - pandas=2.2
   - pillow=10.2
+  - pip=23
   - pyarrow>=14.0,<16
   - pytorch=2.2
   - pytorch-cuda=12.1

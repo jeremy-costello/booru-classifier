@@ -20,7 +20,7 @@ class ConvNextV2ForMultiLabelClassification(nn.Module):
         x = self.activation(x)
         return x
     
-    def get_optimizer_groups(self):
+    def get_optimizer_groups(self, weight_decay):
         # https://github.com/karpathy/minGPT/blob/master/mingpt/model.py
         decay = set()
         no_decay = set()
@@ -46,7 +46,7 @@ class ConvNextV2ForMultiLabelClassification(nn.Module):
                                                     % (str(param_dict.keys() - union_params), )
 
         optim_groups = [
-            {"params": [param_dict[pn] for pn in sorted(list(decay))], "weight_decay": self.weight_decay},
+            {"params": [param_dict[pn] for pn in sorted(list(decay))], "weight_decay": weight_decay},
             {"params": [param_dict[pn] for pn in sorted(list(no_decay))], "weight_decay": 0.0},
         ]
 

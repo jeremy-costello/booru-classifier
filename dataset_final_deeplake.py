@@ -1,8 +1,8 @@
 import os
 import json
-import shutil
 import sqlite3
 import deeplake
+import contextlib
 import numpy as np
 from tqdm import tqdm
 import dask.dataframe as dd
@@ -26,6 +26,8 @@ channel_size = parameter_dict["dataset"]["channel_size"]
 chunks = parameter_dict["dataset"]["final_chunks"]
 stats_rounding = parameter_dict["dataset"]["stats_rounding"]
 
+debug = parameter_dict["scraping"]["debug"]
+
 conn = sqlite3.connect(database_file)
 cursor = conn.cursor()
 
@@ -42,22 +44,32 @@ with open(tag_indices_file, 'r') as f:
 vocab_size = tag_indices["vocab_size"]
 
 
-def image_and_tags(id_, tags, file_extension):   
+def error_return():
+    return (
+        -1,
+        np.zeros((image_size, image_size, channel_size), dtype=np.uint8),
+        np.zeros(channel_size, dtype=np.float32),
+        np.zeros(channel_size, dtype=np.float32),
+        np.zeros(vocab_size, dtype=np.int64)
+    )
+
+
+def image_and_tags(id_, tags, file_extension):
     image_path = f"{image_save_root}/{id_}.{file_extension}"
     try:
         try:
             image = Image.open(image_path)
         except Image.DecompressionBombError:
-            return None
+            return error_return()
         
         try:
             image = image.convert("RGBA")
             image = image.convert("RGB")
             image = image.resize((image_size, image_size))
         except OSError:
-            return None
+            return error_return()
     except UnidentifiedImageError:
-        return None
+        return error_return()
     
     image_array = np.array(image, dtype=np.uint8)
     image_float = image_array.astype(np.float32) / 255.0
@@ -98,6 +110,7 @@ total_rows = len(ddf)
 validation_set = set(ddf["id"].sample(frac=validation_fraction).compute())
 
 ddf["chunk"] = ddf["id"] % chunks
+chunk_counts = ddf["chunk"].value_counts().compute().to_dict()
 
 dataset_stats = {
     "count": {
@@ -108,44 +121,55 @@ dataset_stats = {
     "std": 0
 }
 
-root = "data"
-lakes = dict()
-for split in ["train", "valid"]:
-    lake_path = deeplake_file_template.format(root=root, split=split)
-    lakes[split] = deeplake.empty(lake_path, overwrite=True)
+if debug:
+    lakes = {
+        "train": contextlib.nullcontext(),
+        "valid": contextlib.nullcontext()
+    }
+else:
+    root = "data"
+    lakes = dict()
+    for split in ["train", "valid"]:
+        lake_path = deeplake_file_template.format(root=root, split=split)
+        lakes[split] = deeplake.empty(lake_path)
 
 with lakes["train"], lakes["valid"]:
-    for split in ["train", "valid"]:
-        lakes[split].create_tensor("images", htype="image.rgb", sample_compression="jpg")
-        lakes[split].create_tensor("tags", htype="class_label")
+    if not debug:
+        for split in ["train", "valid"]:
+            lakes[split].create_tensor("images", htype="image.rgb", sample_compression="jpg")
+            lakes[split].create_tensor("tags", htype="class_label")
     
     for chunk in tqdm(range(chunks)):
         chunked_ddf = ddf[ddf["chunk"] == chunk]
         chunked_ddf = chunked_ddf.drop(columns=["chunk"])
         chunked_ddf = chunked_ddf.apply(iat_dask_wrapper, axis=1, result_type="expand", meta=iat_schema)
-        chunked_ddf = chunked_ddf.dropna()
         chunked_ddf = chunked_ddf.reset_index(drop=True)
         chunked_ddf.columns = ["id", "image_array", "image_mean", "image_std", "tags_array"]
         
-        approximate_total = total_rows // chunks
-        for index, row in tqdm(chunked_ddf.iterrows(), total=approximate_total, leave=False):
-            if row.id not in validation_set:
+        for row in tqdm(chunked_ddf.itertuples(index=False), total=chunk_counts[chunk], leave=True):
+            if row.id == -1:
+                continue
+            elif row.id not in validation_set:
                 split = "train"
-                dataset_stats["mean"] += row.image_mean
-                dataset_stats["std"] += row.image_std
+                if not debug:
+                    dataset_stats["mean"] += row.image_mean
+                    dataset_stats["std"] += row.image_std
             else:
                 split = "valid"
 
-            lakes[split].append(row.image_array)
-            lakes[split].append(row.tags_array)
+            if not debug:
+                # will these always be appended in the same position?
+                lakes[split].images.append(row.image_array)
+                lakes[split].tags.append(row.tags_array)
                             
             dataset_stats["count"][split] += 1
 
 print(dataset_stats["count"])
 
-for stat in ["mean", "std"]:
-    dataset_stats[stat] = [round(stat, stats_rounding) for stat in
-                           (dataset_stats[stat] / dataset_stats["count"]["train"]).tolist()]
+if not debug:
+    for stat in ["mean", "std"]:
+        dataset_stats[stat] = [round(stat, stats_rounding) for stat in
+                            (dataset_stats[stat] / dataset_stats["count"]["train"]).tolist()]
 
-with open(dataset_statistics_json, "w") as f:
-    json.dump(dataset_stats, f, indent=4)
+    with open(dataset_statistics_json, "w") as f:
+        json.dump(dataset_stats, f, indent=4)
