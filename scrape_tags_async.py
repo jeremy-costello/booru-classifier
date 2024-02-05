@@ -11,10 +11,10 @@ from data.parameters import build_parameter_dict
 
 parameter_dict = build_parameter_dict()
 
+debug = parameter_dict["debug"]
 booru_url = parameter_dict["booru_url"]
 database_file = parameter_dict["database_file"]
 max_retries = parameter_dict["scraping"]["max_retries"]
-debug = parameter_dict["scraping"]["debug"]
 
 search_dict = dict()
 

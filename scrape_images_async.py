@@ -16,11 +16,11 @@ GOOD_EXTENSIONS = ["jpeg", "jpg", "png"]
 
 parameter_dict = build_parameter_dict()
 
+debug = parameter_dict["debug"]
 database_file = parameter_dict["database_file"]
 image_save_root = parameter_dict["image_save_root"]
 batch_size = parameter_dict["scraping"]["image_batch_size"]
 max_retries = parameter_dict["scraping"]["max_retries"]
-debug = parameter_dict["scraping"]["debug"]
 download_type = parameter_dict["scraping"]["download_type"]
 
 

@@ -23,11 +23,11 @@ MAP_DICT = {
 
 parameter_dict = build_parameter_dict()
 
+debug = parameter_dict["debug"]
 booru_url = parameter_dict["booru_url"]
 database_file = parameter_dict["database_file"]
 min_batch_size = parameter_dict["scraping"]["post_min_batch_size"]
 max_retries = parameter_dict["scraping"]["max_retries"]
-debug = parameter_dict["scraping"]["debug"]
 
 
 def create_tables(cursor):

@@ -53,6 +53,7 @@ def main():
         fig, axes = plt.subplots(1, len(images), figsize=(15, 5))
     
         for i, image in enumerate(images):
+            # add label with list of tags
             image = rearrange(image, "c h w -> h w c")
             image = image.detach().cpu().numpy()
             axes[i].imshow(image)

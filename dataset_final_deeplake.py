@@ -6,6 +6,7 @@ import contextlib
 import numpy as np
 from tqdm import tqdm
 import dask.dataframe as dd
+from dask.diagnostics import ProgressBar
 from PIL import Image, UnidentifiedImageError
 
 from data.parameters import build_parameter_dict
@@ -13,6 +14,7 @@ from data.parameters import build_parameter_dict
 
 parameter_dict = build_parameter_dict()
 
+debug = parameter_dict["debug"]
 database_file = parameter_dict["database_file"]
 image_save_root = parameter_dict["image_save_root"]
 tag_indices_file = parameter_dict["tag_indices_json"]
@@ -26,7 +28,6 @@ channel_size = parameter_dict["dataset"]["channel_size"]
 chunks = parameter_dict["dataset"]["final_chunks"]
 stats_rounding = parameter_dict["dataset"]["stats_rounding"]
 
-debug = parameter_dict["scraping"]["debug"]
 
 conn = sqlite3.connect(database_file)
 cursor = conn.cursor()
@@ -107,7 +108,7 @@ full_skeleton_url = f"file://{os.getcwd()}/{skeleton_url}"
 ddf = dd.read_parquet(full_skeleton_url)
 
 total_rows = len(ddf)
-validation_set = set(ddf["id"].sample(frac=validation_fraction).compute())
+validation_ids_set = set(ddf["id"].sample(frac=validation_fraction).compute())
 
 ddf["chunk"] = ddf["id"] % chunks
 chunk_counts = ddf["chunk"].value_counts().compute().to_dict()
@@ -140,36 +141,37 @@ with lakes["train"], lakes["valid"]:
             lakes[split].create_tensor("tags", htype="class_label")
     
     for chunk in tqdm(range(chunks)):
-        chunked_ddf = ddf[ddf["chunk"] == chunk]
-        chunked_ddf = chunked_ddf.drop(columns=["chunk"])
-        chunked_ddf = chunked_ddf.apply(iat_dask_wrapper, axis=1, result_type="expand", meta=iat_schema)
-        chunked_ddf = chunked_ddf.reset_index(drop=True)
-        chunked_ddf.columns = ["id", "image_array", "image_mean", "image_std", "tags_array"]
+        chunked_dask_df = ddf[ddf["chunk"] == chunk]
+        chunked_dask_df = chunked_dask_df.drop(columns=["chunk"])
+        chunked_dask_df = chunked_dask_df.apply(iat_dask_wrapper, axis=1, result_type="expand", meta=iat_schema)
+        chunked_dask_df = chunked_dask_df.reset_index(drop=True)
+        chunked_dask_df.columns = ["id", "image_array", "image_mean", "image_std", "tags_array"]
         
-        for row in tqdm(chunked_ddf.itertuples(index=False), total=chunk_counts[chunk], leave=True):
-            if row.id == -1:
-                continue
-            elif row.id not in validation_set:
-                split = "train"
-                if not debug:
-                    dataset_stats["mean"] += row.image_mean
-                    dataset_stats["std"] += row.image_std
-            else:
-                split = "valid"
-
+        with ProgressBar():
+            chunked_pandas_df = chunked_dask_df.compute()
+        
+        chunked_pandas_df = chunked_pandas_df[chunked_pandas_df["id"] != -1]
+        chunked_pandas_df_dict = {
+            "train": chunked_pandas_df[~chunked_pandas_df["id"].isin(validation_ids_set)],
+            "valid": chunked_pandas_df[chunked_pandas_df["id"].isin(validation_ids_set)]
+        }
+        
+        dataset_stats["mean"] += chunked_pandas_df_dict["train"]["image_mean"].sum()
+        dataset_stats["std"] += chunked_pandas_df_dict["train"]["image_std"].sum()
+        
+        for split in ["train", "valid"]:
             if not debug:
-                # will these always be appended in the same position?
-                lakes[split].images.append(row.image_array)
-                lakes[split].tags.append(row.tags_array)
-                            
-            dataset_stats["count"][split] += 1
+                lakes[split].images.extend(chunked_pandas_df_dict[split]["image_array"].to_list(), progressbar=False)
+                lakes[split].tags.extend(chunked_pandas_df_dict[split]["tags_array"].to_list(), progressbar=False)
+            
+            dataset_stats["count"][split] += len(chunked_pandas_df_dict[split])
 
-print(dataset_stats["count"])
+for stat in ["mean", "std"]:
+    dataset_stats[stat] = [round(stat, stats_rounding) for stat in
+                           (dataset_stats[stat] / dataset_stats["count"]["train"]).tolist()]
+
+print(dataset_stats)
 
 if not debug:
-    for stat in ["mean", "std"]:
-        dataset_stats[stat] = [round(stat, stats_rounding) for stat in
-                            (dataset_stats[stat] / dataset_stats["count"]["train"]).tolist()]
-
     with open(dataset_statistics_json, "w") as f:
         json.dump(dataset_stats, f, indent=4)

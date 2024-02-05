@@ -1,4 +1,5 @@
 PARAMETER_DICT = {
+    "debug": True,
     "booru_url": "https://safebooru.org",
     "file_root": "./data",
     "deeplake_file_template": "{root}/{split}_lake",
@@ -12,7 +13,6 @@ PARAMETER_DICT = {
     },
     "scraping": {
         "max_retries": 10,
-        "debug": True,
         "post_min_batch_size": 8192,
         "image_batch_size": 8192,
         "tag_batch_size": 512,
@@ -54,6 +54,7 @@ PARAMETER_DICT = {
 
 def build_parameter_dict():
     parameter_dict = {
+        "debug": PARAMETER_DICT["debug"],
         "booru_url": PARAMETER_DICT["booru_url"],
         "deeplake_file_template": PARAMETER_DICT["deeplake_file_template"],
         "scraping": PARAMETER_DICT["scraping"],
