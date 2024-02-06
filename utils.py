@@ -1,7 +1,12 @@
 import torch
+import torch.nn as nn
 from types import MethodType
-from typing import Any, Type, TypeVar
 from lightning.fabric.loggers import CSVLogger
+from typing import Any, Optional, Type, TypeVar
+
+
+def num_parameters(module: nn.Module, requires_grad: Optional[bool] = None) -> int:
+    return sum(p.numel() for p in module.parameters() if requires_grad is None or p.requires_grad == requires_grad)
 
 
 T = TypeVar("T")

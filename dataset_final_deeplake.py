@@ -2,10 +2,10 @@ import os
 import json
 import sqlite3
 import deeplake
-import contextlib
 import numpy as np
 from tqdm import tqdm
 import dask.dataframe as dd
+from contextlib import nullcontext
 from dask.diagnostics import ProgressBar
 from PIL import Image, UnidentifiedImageError
 
@@ -124,8 +124,8 @@ dataset_stats = {
 
 if debug:
     lakes = {
-        "train": contextlib.nullcontext(),
-        "valid": contextlib.nullcontext()
+        "train": nullcontext(),
+        "valid": nullcontext()
     }
 else:
     root = "data"

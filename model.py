@@ -6,12 +6,19 @@ from transformers.models.convnextv2.modeling_convnextv2 import ConvNextV2LayerNo
 class ConvNextV2ForMultiLabelClassification(nn.Module):
     def __init__(self, config, output_size, vocab_size, use_sigmoid):
         super().__init__()
-        self.body = ConvNextV2Model(config)
+        self.config = config
+        self.body = ConvNextV2Model(self.config)
         self.head = nn.Linear(output_size, vocab_size)
         if use_sigmoid:
             self.activation = nn.Sigmoid()
         else:
             self.activation = nn.Identity()
+    
+    def init_weights(self):
+        self.body.apply(self.body._init_weights)
+        self.head.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
+        if self.head.bias is not None:
+            self.head.bias.data.zero_()
     
     def forward(self, x):
         x = self.body(x)

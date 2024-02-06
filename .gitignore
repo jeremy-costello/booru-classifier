@@ -167,6 +167,7 @@ backup/
 deeplake/
 final_processing.py
 ts_test.py
+speed_monitor.py
 pyproject.toml
 poetry.lock
 *.ipynb

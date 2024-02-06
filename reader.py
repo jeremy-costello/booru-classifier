@@ -38,18 +38,32 @@ def main():
     
     train_dataset = DeepLakeDataset(deeplake_file_template, dataset_statistics, transform, split="train")
 
-    train_sampler = BatchSampler(DistributedSampler(train_dataset, shuffle=True), batch_size=4, drop_last=True)
+    train_sampler = BatchSampler(
+        DistributedSampler(
+            train_dataset,
+            num_replicas=1,
+            rank=0,
+            shuffle=True,
+            seed=0,
+            drop_last=True),
+        batch_size=4,
+        drop_last=True)
+    
     train_loader = DataLoader(
         train_dataset,
+        batch_size=4,
         sampler=train_sampler,
-        pin_memory=False,
-        num_workers=num_workers
+        num_workers=num_workers,
+        pin_memory=True,
+        drop_last=True
     )
 
     train_loader = fabric.setup_dataloaders(train_loader, use_distributed_sampler=False)
 
     for batch in train_loader:
-        images = batch["images"].squeeze(0)
+        images = batch["images"]
+        # batch (sampler) and batch (loader)
+        images = rearrange(images, "bs bl c h w -> (bs bl) c h w")
         tags = batch["tags"]
         fig, axes = plt.subplots(1, len(images), figsize=(15, 5))
     
@@ -80,6 +94,7 @@ class DeepLakeDataset(Dataset):
     def __getitem__(self, indices):
         image_batch = self.lake.images[indices, :, :, :].numpy()
         image_batch = torch.tensor(image_batch, dtype=torch.uint8)
+        # batch (sampler) and batch (loader)
         image_batch = rearrange(image_batch, "b h w c -> b c h w")
         image_batch = self.transform(image_batch)
         

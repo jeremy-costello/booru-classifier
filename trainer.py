@@ -1,15 +1,22 @@
+# adapted from:
 # https://github.com/jzhang38/TinyLlama/blob/main/pretrain/tinyllama.py
+
 import json
+import math
 import time
 import torch
+import random
+from torch import nn
 import lightning as L
 from tqdm import tqdm
 from pathlib import Path
-from typing import Union
+from einops import rearrange
+import torch.nn.functional as F
+from typing import Union, Tuple
 from transformers import ConvNextV2Config
 from torchvision.ops import sigmoid_focal_loss
 import torchvision.transforms.v2 as transforms
-from pytorch_lightning.loggers import WandbLogger
+#from pytorch_lightning.loggers import WandbLogger
 from lightning.fabric.strategies import FSDPStrategy, XLAStrategy
 from torch.utils.data import DataLoader, BatchSampler, DistributedSampler
 from transformers.models.convnextv2.modeling_convnextv2 import ConvNextV2Layer
@@ -17,19 +24,22 @@ from transformers.models.convnextv2.modeling_convnextv2 import ConvNextV2Layer
 from reader import DeepLakeDataset
 from data.parameters import build_parameter_dict
 from model import ConvNextV2ForMultiLabelClassification
-from utils import step_csv_logger, get_default_supported_precision
+from utils import get_default_supported_precision, num_parameters, step_csv_logger
 
-
-# load this from parameters.py too
-model_name = None
-name = None
-out_dir = None
 
 parameter_dict = build_parameter_dict()
 
+seed = parameter_dict["training"]["seed"]
+if seed is None:
+    seed = random.randint(0, 2 ** 32 - 1)
+
+model_name = parameter_dict["training"]["model_name"]
+name = parameter_dict["training"]["name"]
+out_dir = Path("out") / name
+
 matmul_precision = parameter_dict["training"]["matmul_precision"]
 num_devices = parameter_dict["training"]["num_devices"]
-precision = parameter_dict["training"]["precision"]
+precision_maybe = parameter_dict["training"]["precision"]
 tpu = parameter_dict["training"]["tpu"]
 num_workers = parameter_dict["training"]["num_workers"]
 global_batch_size = parameter_dict["training"]["global_batch_size"]
@@ -73,17 +83,14 @@ log_iter_interval = log_step_interval * gradient_accumulation_steps
 
 hparams = {k: v for k, v in locals().items() if isinstance(v, (int, float, str)) and not k.startswith("_")}
 logger = step_csv_logger("out", name, flush_logs_every_n_steps=log_iter_interval)
-wandb_logger = WandbLogger()
+#wandb_logger = WandbLogger()
 
 
 def setup(
     resume: Union[bool, Path] = False
 ) -> None:
     devices = num_devices
-    # should this be elsewhere?
-    if matmul_precision is not None:
-        torch.set_float32_matmul_precision(matmul_precision)
-    precision = precision or get_default_supported_precision(training=True, tpu=tpu)
+    precision = precision_maybe or get_default_supported_precision(training=True, tpu=tpu)
     
     if num_devices > 1:
         if tpu:
@@ -100,13 +107,212 @@ def setup(
     else:
         strategy = "auto"
     
-    fabric = L.Fabric(devices=devices, strategy=strategy, precision=precision, loggers=[logger, wandb_logger])
+    fabric = L.Fabric(devices=devices, strategy=strategy, precision=precision, loggers=[logger])#, wandb_logger])
     fabric.print(hparams)
     main(fabric, resume)
 
 
-# increment seed by 1 per device rank
-def create_dataloaders():
+def main(fabric, resume):
+    # skipped monitor from tinyllama
+    
+    if fabric.global_rank == 0:
+        out_dir.mkdir(parents=True, exist_ok=True)
+    
+    # auto configs?
+    # https://github.com/jzhang38/TinyLlama/blob/main/lit_gpt/config.py
+    # config = Config.from_name(model_name)
+    config = ConvNextV2Config()
+    
+    train_loader, valid_loader = create_dataloaders(
+        batch_size=micro_batch_size,
+        fabric=fabric,
+        seed=seed
+    )
+    train_loader, valid_loader = fabric.setup_dataloaders(train_loader, valid_loader,
+                                                          use_distributed_sampler=False)
+    
+    fabric.seed_everything(seed)
+    
+    fabric.print(f"Loading model with {config.__dict__}")
+    t0 = time.perf_counter()
+    with fabric.init_module(empty_init=False):
+        # all model stuff in config, custom _init_weights?
+        model = ConvNextV2ForMultiLabelClassification(
+            config,
+            output_size=config.hidden_sizes[-1],
+            vocab_size=vocab_size,
+            use_sigmoid=False
+        )
+        model.init_weights()
+    
+    fabric.print(f"Time to instantiate model: {(time.perf_counter() - t0):.2f} seconds")
+    fabric.print(f"Total parameters {num_parameters(model):,}")
+    
+    model = fabric.setup(model)
+    
+    optimizer = torch.optim.AdamW(model.get_optimizer_groups(weight_decay),
+                                lr=learning_rate, betas=(beta1, beta2), foreach=False)
+    optimizer = fabric.setup_optimizers(optimizer)
+    
+    state = {
+        "model": model,
+        "optimizer": optimizer,
+        "hparams": hparams,
+        "epoch_count": 0,
+        "epoch_iter_count": 0,
+        "epoch_step_count": 0,
+        "total_iter_count": 0,
+        "total_step_count": 0
+    }
+    
+    if resume:
+        resume = sorted(out_dir.glob("*.pth"))[-1]
+    if resume:
+        fabric.print(f"Resuming training from {resume}")
+        fabric.load(resume, state)
+    
+    assert seed == state["hparams"]["seed"]
+    
+    train_time = time.perf_counter()
+    train(fabric, state, train_loader, valid_loader, resume)
+    fabric.print(f"Training time: {(time.perf_counter() - train_time):.2f} seconds")
+    if fabric.device.type == "cuda":
+        fabric.print(f"Memory used: {torch.cuda.max_memory_allocated() / 1e9:.02f} GB")
+    
+
+def train(fabric, state, train_loader, valid_loader, resume):
+    model = state["model"]
+    optimizer = state["optimizer"]
+    
+    validate(fabric, model, valid_loader)
+    
+    # skipped flops stuff from tinyllama
+    
+    total_t0 = time.perf_counter()
+    
+    if fabric.device.type == "xla":
+        import torch_xla.core.xla_model as xm
+
+        xm.mark_step()
+    
+    initial_epoch = state["epoch_count"]
+    initial_epoch_iter = state["epoch_iter_count"]
+    initial_total_iter = state["total_iter_count"]
+    curr_epoch_iter = 0
+    
+    loss_function = sigmoid_focal_loss
+    
+    if state["total_iter_count"] >= max_iters:
+        fabric.print("Total iterations >= maximum iterations")
+        return
+
+    for epoch in range(num_epochs):
+        if resume:
+            if epoch < initial_epoch:
+                continue
+        else:
+            assert epoch == state["epoch_count"]
+        for train_batch in train_loader:
+            if resume:
+                if curr_epoch_iter < initial_epoch_iter:
+                    curr_epoch_iter += 1
+                    continue
+                else:
+                    resume = False
+                    curr_epoch_iter = -1
+                    fabric.barrier()
+                    fabric.print(f"Resume finished. Took {time.perf_counter() - total_t0} seconds")
+
+            if state["total_iter_count"] >= max_iters:
+                break
+
+            # only need to get LR on gradient accumulation steps?
+            lr = get_lr(state["total_iter_count"]) if decay_lr else learning_rate
+            for param_group in optimizer.param_groups:
+                param_group["lr"] = lr
+            
+            iter_t0 = time.perf_counter()
+            
+            images = train_batch["images"]
+            images = rearrange(images, "bs bl c h w -> (bs bl) c h w")
+            tags = train_batch["tags"]
+            tags = rearrange(tags, "bs bl t -> (bs bl) t")
+            
+            is_accumulating = (state["total_iter_count"] + 1) % gradient_accumulation_steps != 0
+            with fabric.no_backward_sync(model, enabled=is_accumulating):
+                outputs = model(images)
+                loss = loss_function(outputs, tags, reduction="mean")
+                fabric.backward(loss / gradient_accumulation_steps)
+            
+            if not is_accumulating:
+                fabric.clip_gradients(model, optimizer, max_norm=grad_clip)
+                optimizer.step()
+                optimizer.zero_grad()
+                state["epoch_step_count"] += 1
+                state["total_step_count"] += 1
+            elif fabric.device.type == "xla":
+                xm.mark_step()
+            
+            state["epoch_iter_count"] += 1
+            state["total_iter_count"] += 1
+            t1 = time.perf_counter()
+            
+            fabric.print(
+                f"epoch {state['epoch_count']}: iter {state['epoch_iter_count']}, step {state['epoch_step_count']}: loss {loss.item():.4f},"
+                f" iter time: {(t1 - iter_t0) * 1000:.2f}ms{' optimizer.step' if not is_accumulating else ''}"
+                f" total iters: {state['total_iter_count']}, total steps: {state['total_step_count']}"
+                f" remaining time: {(t1 - total_t0) / (state['total_iter_count'] - initial_total_iter) * (max_iters - state['total_iter_count']) / 3600:.2f} hours" 
+                f" or {(t1 - total_t0) / (state['total_iter_count'] - initial_total_iter) * (max_iters - state['total_iter_count']) / 3600 / 24:.2f} days"
+            )
+            
+            # monitor stuff
+            
+            if not is_accumulating and state["total_step_count"] % eval_step_interval == 0:
+                t0 = time.perf_counter()
+                val_loss = validate(fabric, model, valid_loader)
+                t1 = time.perf_counter() - t0
+                # monitor stuff
+                fabric.print(f"step {state['total_step_count']}: val loss {val_loss:.4f}, val time: {t1 * 1000:.2f}ms")
+                fabric.log_dict(
+                    {
+                        "metric/val_loss": val_loss.item(),
+                        "total_images": (state["total_iter_count"] + 1) * micro_batch_size * fabric.world_size
+                    },
+                    state["total_step_count"]
+                )
+                fabric.barrier()
+            if not is_accumulating and state["total_step_count"] % save_step_interval == 0:
+                checkpoint_path = out_dir / f"iter-{state['total_iter_count']:06d}-ckpt.pth"
+                fabric.print(f"Saving checkpoint to {str(checkpoint_path)!r}")
+                fabric.save(checkpoint_path, state)
+        
+        state["epoch_count"] += 1
+
+
+@torch.no_grad()
+def validate(fabric: L.Fabric, model: nn.Module, valid_loader: DataLoader) -> torch.Tensor:
+    fabric.print("Validating ...")
+    model.eval()
+
+    valid_batches = count_valid // (fabric.world_size * micro_batch_size)
+    losses = torch.zeros(valid_batches, device=fabric.device)
+    for k, valid_batch in enumerate(tqdm(valid_loader, leave=False)):
+        images = valid_batch["images"]
+        images = rearrange(images, "bs bl c h w -> (bs bl) c h w")
+        tags = valid_batch["tags"]
+        tags = rearrange(tags, "bs bl t -> (bs bl) t")
+        
+        outputs = model(images)
+        loss = F.binary_cross_entropy_with_logits(outputs, tags, reduction="mean")
+        losses[k] = loss.item()
+
+    out = losses.mean()
+
+    model.train()
+    return out
+
+
+def create_dataloaders(batch_size: int, fabric: L.Fabric, seed: int) -> Tuple[DataLoader, DataLoader]:
     train_transform = transforms.Compose([
         transforms.RandomHorizontalFlip(),
         transforms.TrivialAugmentWide(),
@@ -122,114 +328,66 @@ def create_dataloaders():
     train_dataset = DeepLakeDataset(parameter_dict["deeplake_file_template"], dataset_statistics, train_transform, "train")
     valid_dataset = DeepLakeDataset(parameter_dict["deeplake_file_template"], dataset_statistics, valid_transform, "valid")
 
-    # batch sizes in sampler and loader then concatenate along first dimension?
-    train_sampler = BatchSampler(DistributedSampler(train_dataset, shuffle=True), batch_size=batch_size, drop_last=True)
-    valid_sampler = BatchSampler(DistributedSampler(valid_dataset, shuffle=False), batch_size=batch_size, drop_last=False)
+    train_sampler = BatchSampler(
+        DistributedSampler(
+            train_dataset,
+            num_replicas=fabric.world_size,
+            rank=fabric.global_rank,
+            shuffle=True,
+            seed=seed,
+            drop_last=True),
+        batch_size=batch_size,
+        drop_last=True)
+    
+    valid_sampler = BatchSampler(
+        DistributedSampler(
+            valid_dataset,
+            num_replicas=fabric.world_size,
+            rank=fabric.global_rank,
+            shuffle=False,
+            drop_last=True),
+        batch_size=batch_size,
+        drop_last=True)
 
     train_loader = DataLoader(
         train_dataset,
+        batch_size=1,
         sampler=train_sampler,
+        num_workers=num_workers,
         pin_memory=True,
-        num_workers=num_workers
+        drop_last=True
     )
 
     valid_loader = DataLoader(
         valid_dataset,
+        batch_size=1,
         sampler=valid_sampler,
+        num_workers=num_workers,
         pin_memory=True,
-        num_workers=num_workers
+        drop_last=True
     )
     
     return train_loader, valid_loader
 
 
-def main(fabric, resume):
-    #fabric.launch()
+# learning rate decay scheduler (cosine with warmup)
+def get_lr(it):
+    # 1) linear warmup for warmup_iters steps
+    if it < warmup_iters:
+        return learning_rate * it / warmup_iters
+    # 2) if it > lr_decay_iters, return min learning rate
+    if it > lr_decay_iters:
+        return min_lr
+    # 3) in between, use cosine decay down to min learning rate
+    decay_ratio = (it - warmup_iters) / (lr_decay_iters - warmup_iters)
+    assert 0 <= decay_ratio <= 1
+    coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))  # coeff ranges 0..1
+    return min_lr + coeff * (learning_rate - min_lr)
 
-    # https://github.com/jzhang38/TinyLlama/blob/main/lit_gpt/speed_monitor.py
-    # monitor = Monitor(fabric, window_size=2, time_unit="seconds", log_iter_interval=log_iter_interval)
-    
-    if fabric.global_rank == 0:
-        out_dir.mkdir(parents=True, exist_ok=True)
-    
-    # auto configs?
-    # config = Config.from_name(model_name)
-    config = ConvNextV2Config()
-    
-    # add seeding to this (and other places?)
-    train_loader, valid_loader = create_dataloaders()
-    train_loader, valid_loader = fabric.setup_dataloaders(train_loader, valid_loader,
-                                                          use_distributed_sampler=False)
 
-    # left out some model loading stuff from tinyllama
-    model = ConvNextV2ForMultiLabelClassification(
-        config,
-        output_size=config.hidden_sizes[-1],
-        vocab_size=vocab_size,
-        use_sigmoid=False
-    )
-    model, optimizer = fabric.setup(model)
+if __name__ == "__main__":
+    if matmul_precision is not None:
+        torch.set_float32_matmul_precision(matmul_precision)
     
-    # foreach / fused ???
-    optimizer = torch.optim.AdamW(model.get_optimizer_groups(weight_decay),
-                                lr=learning_rate, betas=(beta1, beta2))
-    fabric.setup_optimizers(optimizer)
+    setup()
     
-    state = {
-        "model": model,
-        "optimizer": optimizer,
-        "hparams": hparams,
-        "iter_num": 0,
-        "step_count": 0
-    }
-    
-    if resume:
-        resume = sorted(out_dir.glob("*.pth"))[-1]
-    if resume:
-        fabric.print(f"Resuming training from {resume}")
-        fabric.load(resume, state)
-    
-    train_time = time.perf_counter()
-    train(fabric, state, train_loader, valid_loader, resume)
-    fabric.print(f"Training time: {(time.perf_counter()-train_time):.2f}s")
-    if fabric.device.type == "cuda":
-        fabric.print(f"Memory used: {torch.cuda.max_memory_allocated() / 1e9:.02f} GB")
-    
-
-def train(fabric, state, train_loader, valid_loader, resume):
-    model = state["model"]
-    optimizer = state["optimizer"]
-    
-    #validate(fabric, model, valid_loader)
-    
-    # left out some meta flops stuff from tinyllama
-    
-    total_t0 = time.perf_counter()
-    
-    if fabric.device.type == "xla":
-        import torch_xla.core.xla_model as xm
-
-        xm.mark_step()
-    
-    initial_iter = state["iter_num"]
-    curr_iter = 0
-    
-    loss_function = sigmoid_focal_loss
-
-    # more stuff from tinyllama to add here
-    model.train()
-    for epoch in tqdm(range(num_epochs)):
-        for batch in tqdm(train_loader, leave=False):
-            optimizer.zero_grad(set_to_none=True)
-            
-            images = batch["images"].squeeze(0)
-            tags = batch["tags"].squeeze(0)
-
-            output = model(images)
-            loss = loss_function(output, tags, reduction="sum")
-            # precision, recall, F1, confusion matrix, accuracy, positive accuracy, negative accuracy
-            
-            fabric.backward(loss)
-        
-        print(loss)
-        

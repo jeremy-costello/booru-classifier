@@ -29,7 +29,10 @@ PARAMETER_DICT = {
         "stats_rounding": 4,
     },
     "training": {
-        "matmul_precision": None,
+        "seed": None,
+        "model_name": None,
+        "name": None,
+        "matmul_precision": "high",
         "num_devices": 1,
         "precision": "bf16-mixed",
         "tpu": False,
