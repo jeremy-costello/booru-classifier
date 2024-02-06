@@ -206,7 +206,7 @@ def train(fabric, state, train_loader, valid_loader, resume):
     
     total_t0 = time.perf_counter()
     
-    if fabric.device_type == "xla":
+    if fabric.device.type == "xla":
         import torch_xla.core.xla_model as xm
 
         xm.mark_step()

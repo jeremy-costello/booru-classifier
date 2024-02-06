@@ -1,6 +1,7 @@
 import json
 import torch
 import deeplake
+import numpy as np
 import lightning as L
 from einops import rearrange
 import matplotlib.pyplot as plt
@@ -83,7 +84,7 @@ class DeepLakeDataset(Dataset):
         image_batch = self.transform(image_batch)
         
         tags_batch = self.lake.tags[indices, :].numpy()
-        tags_batch = torch.tensor(tags_batch, dtype=torch.float32)
+        tags_batch = torch.tensor(tags_batch.astype(np.float32), dtype=torch.float32)
 
         return {
             "images": image_batch,
