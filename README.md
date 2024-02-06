@@ -14,8 +14,9 @@ Download tagged images from any booru with similar structure to [safebooru](http
 - run ```dataset_skeleton.py``` to get tag data jsons and create Dask DF of image data.
 - run ```dataset_final_deeplake.py``` to store image and tag arrays in a [deeplake](https://github.com/activeloopai/deeplake) dataframe.
 - run ```reader.py``` to test the pytorch dataset is working (saves a sample on the persistent volume as ```plotted_images.png```).
-- run ```trainer.py``` for a basic training loop (WIP).
+- run ```trainer.py```to train a model.
 
 # todo
-- finish training code
+- test training code
+- add docker volume for training outputs
 - train a model
