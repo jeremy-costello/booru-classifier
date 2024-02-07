@@ -10,6 +10,7 @@ dependencies:
   - beautifulsoup4=4
   - dask=2024.1
   - einops=0.7
+  - jsonargparse=4
   - lightning=2.1
   - matplotlib=3
   - numpy=1.26
@@ -22,5 +23,6 @@ dependencies:
   - torchvision=0.17
   - tqdm=4
   - transformers=4.37
+  - wandb=0.16
 platforms:
   - linux-64

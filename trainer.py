@@ -16,7 +16,7 @@ from typing import Union, Tuple
 from transformers import ConvNextV2Config
 from torchvision.ops import sigmoid_focal_loss
 import torchvision.transforms.v2 as transforms
-#from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.loggers import WandbLogger
 from lightning.fabric.strategies import FSDPStrategy, XLAStrategy
 from torch.utils.data import DataLoader, BatchSampler, DistributedSampler
 from transformers.models.convnextv2.modeling_convnextv2 import ConvNextV2Layer
@@ -83,7 +83,7 @@ log_iter_interval = log_step_interval * gradient_accumulation_steps
 
 hparams = {k: v for k, v in locals().items() if isinstance(v, (int, float, str)) and not k.startswith("_")}
 logger = step_csv_logger("out", name, flush_logs_every_n_steps=log_iter_interval)
-#wandb_logger = WandbLogger()
+wandb_logger = WandbLogger()
 
 
 def setup(
@@ -107,7 +107,7 @@ def setup(
     else:
         strategy = "auto"
     
-    fabric = L.Fabric(devices=devices, strategy=strategy, precision=precision, loggers=[logger])#, wandb_logger])
+    fabric = L.Fabric(devices=devices, strategy=strategy, precision=precision, loggers=[logger, wandb_logger])
     fabric.print(hparams)
     main(fabric, resume)
 
@@ -386,8 +386,9 @@ def get_lr(it):
 
 
 if __name__ == "__main__":
+    from jsonargparse import CLI
+    
     if matmul_precision is not None:
         torch.set_float32_matmul_precision(matmul_precision)
     
-    setup()
-    
+    CLI(setup)

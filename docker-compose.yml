@@ -14,6 +14,7 @@ services:
               count: 1
               capabilities: [gpu]
     volumes:
-      - ${HOST_DATA_PATH}:/booru-classifier/data
+      - ${HOST_VOLUME_PATH}/data:/booru-classifier/data
+      - ${HOST_VOLUME_PATH}/out:/booru-classifier/out
     tty: true
     stdin_open: true
