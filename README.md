@@ -18,5 +18,5 @@ Download tagged images from any booru with similar structure to [safebooru](http
 
 # todo
 - test training code
-- add docker volume for training outputs
+- add f1 score as training/validation metric
 - train a model
