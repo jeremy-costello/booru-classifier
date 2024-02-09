@@ -162,14 +162,14 @@ cython_debug/
 # CUSTOM
 data/*
 !data/parameters.py
+.docker/
 bazel/
 backup/
 deeplake/
 final_processing.py
-ts_test.py
 speed_monitor.py
+ts_test.py
 pyproject.toml
 poetry.lock
 *.ipynb
 *.txt
-*.whl

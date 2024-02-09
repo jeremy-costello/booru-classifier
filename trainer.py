@@ -29,9 +29,12 @@ from utils import get_default_supported_precision, num_parameters, step_csv_logg
 
 parameter_dict = build_parameter_dict()
 
-seed = parameter_dict["training"]["seed"]
-if seed is None:
+seed_maybe = parameter_dict["training"]["seed"]
+if seed_maybe is None:
+    random.seed()
     seed = random.randint(0, 2 ** 32 - 1)
+else:
+    seed = seed_maybe
 
 model_name = parameter_dict["training"]["model_name"]
 name = parameter_dict["training"]["name"]
@@ -166,12 +169,26 @@ def main(fabric, resume):
     }
     
     if resume:
-        resume = sorted(out_dir.glob("*.pth"))[-1]
-    if resume:
-        fabric.print(f"Resuming training from {resume}")
-        fabric.load(resume, state)
+        if isinstance(resume, Path):
+            resume_pth = resume
+        elif isinstance(resume, bool):
+            pth_glob = sorted(out_dir.glob("*.pth"))
+            if pth_glob:
+                resume_pth = pth_glob[-1]
+            else:
+                raise ValueError("resume set to True, but no *.pth files found")
+        else:
+            raise ValueError("Invalid type for resume. Should be bool or Path")
+        
+        fabric.print(f"Resuming training from {resume_pth}")
+        fabric.load(resume_pth, state)
     
-    assert seed == state["hparams"]["seed"]
+    if seed != state["hparams"]["seed"]:
+        raise ValueError(f"seed in hyperparameters.py ({seed_maybe}) should be the same as"
+                         f" seed in fabric state ({state['hparams']['seed']}))")
+    
+    fabric.print(state["hparams"])
+    fabric.print(seed)
     
     train_time = time.perf_counter()
     train(fabric, state, train_loader, valid_loader, resume)
@@ -206,13 +223,14 @@ def train(fabric, state, train_loader, valid_loader, resume):
         fabric.print("Total iterations >= maximum iterations")
         return
 
-    for epoch in range(num_epochs):
+    # tqdm only on rank 0
+    for epoch in tqdm(range(num_epochs)):
         if resume:
             if epoch < initial_epoch:
                 continue
         else:
             assert epoch == state["epoch_count"]
-        for train_batch in train_loader:
+        for train_batch in tqdm(train_loader, leave=False):
             if resume:
                 if curr_epoch_iter < initial_epoch_iter:
                     curr_epoch_iter += 1
@@ -269,13 +287,18 @@ def train(fabric, state, train_loader, valid_loader, resume):
             
             if not is_accumulating and state["total_step_count"] % eval_step_interval == 0:
                 t0 = time.perf_counter()
-                val_loss = validate(fabric, model, valid_loader)
+                val_dict = validate(fabric, model, valid_loader)
                 t1 = time.perf_counter() - t0
                 # monitor stuff
-                fabric.print(f"step {state['total_step_count']}: val loss {val_loss:.4f}, val time: {t1 * 1000:.2f}ms")
+                fabric.print(f"step {state['total_step_count']}: val loss {val_dict['loss']:.4f},"
+                             f" val precision {val_dict['precision']:.4f}, val recall {val_dict['recall']},"
+                             f" val f1 {val_dict['f1']}, val time: {t1 * 1000:.2f}ms")
                 fabric.log_dict(
                     {
-                        "metric/val_loss": val_loss.item(),
+                        "metric/val_loss": val_dict["loss"],
+                        "metric/val_precision": val_dict["precision"],
+                        "metric/val_recall": val_dict["recall"],
+                        "metric/val_f1": val_dict["f1"],
                         "total_images": (state["total_iter_count"] + 1) * micro_batch_size * fabric.world_size
                     },
                     state["total_step_count"]
@@ -294,8 +317,13 @@ def validate(fabric: L.Fabric, model: nn.Module, valid_loader: DataLoader) -> to
     fabric.print("Validating ...")
     model.eval()
 
+    # does this require fabric.world_size? or is that done automatically
     valid_batches = count_valid // (fabric.world_size * micro_batch_size)
     losses = torch.zeros(valid_batches, device=fabric.device)
+    tp = torch.zeros(vocab_size, device=fabric.device)
+    fp = torch.zeros(vocab_size, device=fabric.device)
+    fn = torch.zeros(vocab_size, device=fabric.device)
+    # tqdm only on rank 0
     for k, valid_batch in enumerate(tqdm(valid_loader, leave=False)):
         images = valid_batch["images"]
         images = rearrange(images, "bs bl c h w -> (bs bl) c h w")
@@ -305,11 +333,29 @@ def validate(fabric: L.Fabric, model: nn.Module, valid_loader: DataLoader) -> to
         outputs = model(images)
         loss = F.binary_cross_entropy_with_logits(outputs, tags, reduction="mean")
         losses[k] = loss.item()
+        
+        # convert for cuda bitwise and
+        tags = tags.to(torch.int64)
+        
+        threshold = 0.5
+        predicted = outputs >= threshold
+        tp += (predicted & tags).sum(dim=0)
+        fp += (predicted & ~tags).sum(dim=0)
+        fn += (~predicted & tags).sum(dim=0)
 
-    out = losses.mean()
+    epsilon = 1e-12
+    precision = tp / (tp + fp + epsilon)
+    recall = tp / (tp + fn + epsilon)
+    f1 = 2 * precision * recall / (precision + recall + epsilon)
 
     model.train()
-    return out
+    # probably something better than mean for precision, recall, f1?
+    return {
+        "loss": losses.mean().item(),
+        "precision": precision.mean().item(),
+        "recall": recall.mean().item(),
+        "f1": f1.mean().item()
+    }
 
 
 def create_dataloaders(batch_size: int, fabric: L.Fabric, seed: int) -> Tuple[DataLoader, DataLoader]:

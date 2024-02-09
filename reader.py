@@ -94,7 +94,6 @@ class DeepLakeDataset(Dataset):
     def __getitem__(self, indices):
         image_batch = self.lake.images[indices, :, :, :].numpy()
         image_batch = torch.tensor(image_batch, dtype=torch.uint8)
-        # batch (sampler) and batch (loader)
         image_batch = rearrange(image_batch, "b h w c -> b c h w")
         image_batch = self.transform(image_batch)
         
