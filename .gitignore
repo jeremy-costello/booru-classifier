@@ -166,10 +166,11 @@ data/*
 bazel/
 backup/
 deeplake/
+poetry/
 final_processing.py
 speed_monitor.py
 ts_test.py
-pyproject.toml
-poetry.lock
+conda-lock.yml
+environment.yml
 *.ipynb
 *.txt

@@ -60,6 +60,7 @@ beta2 = parameter_dict["training"]["beta2"]
 grad_clip = parameter_dict["training"]["grad_clip"]
 decay_lr = parameter_dict["training"]["decay_lr"]
 min_lr = parameter_dict["training"]["min_lr"]
+loss_multiplier = parameter_dict["training"]["loss_multiplier"]
 
 batch_size = global_batch_size // num_devices
 gradient_accumulation_steps = batch_size // micro_batch_size
@@ -153,8 +154,10 @@ def main(fabric, resume):
     
     model = fabric.setup(model)
     
+    # foreach, fused?
     optimizer = torch.optim.AdamW(model.get_optimizer_groups(weight_decay),
-                                lr=learning_rate, betas=(beta1, beta2), foreach=False)
+                                  lr=learning_rate, betas=(beta1, beta2),
+                                  fused=True, foreach=False)
     optimizer = fabric.setup_optimizers(optimizer)
     
     state = {
@@ -224,6 +227,7 @@ def train(fabric, state, train_loader, valid_loader, resume):
         return
 
     # tqdm only on rank 0
+    average_train_loss = 0
     for epoch in tqdm(range(num_epochs)):
         if resume:
             if epoch < initial_epoch:
@@ -259,8 +263,9 @@ def train(fabric, state, train_loader, valid_loader, resume):
             is_accumulating = (state["total_iter_count"] + 1) % gradient_accumulation_steps != 0
             with fabric.no_backward_sync(model, enabled=is_accumulating):
                 outputs = model(images)
-                loss = loss_function(outputs, tags, reduction="mean")
+                loss = loss_multiplier * loss_function(outputs, tags, reduction="sum")
                 fabric.backward(loss / gradient_accumulation_steps)
+                average_train_loss += loss / gradient_accumulation_steps
             
             if not is_accumulating:
                 fabric.clip_gradients(model, optimizer, max_norm=grad_clip)
@@ -268,6 +273,15 @@ def train(fabric, state, train_loader, valid_loader, resume):
                 optimizer.zero_grad()
                 state["epoch_step_count"] += 1
                 state["total_step_count"] += 1
+                
+                fabric.log_dict(
+                    {
+                        "metric/train/loss": average_train_loss
+                    },
+                    state["total_step_count"]
+                )
+                average_train_loss = 0
+            # idk how this works
             elif fabric.device.type == "xla":
                 xm.mark_step()
             
@@ -275,6 +289,7 @@ def train(fabric, state, train_loader, valid_loader, resume):
             state["total_iter_count"] += 1
             t1 = time.perf_counter()
             
+            """
             fabric.print(
                 f"epoch {state['epoch_count']}: iter {state['epoch_iter_count']}, step {state['epoch_step_count']}: loss {loss.item():.4f},"
                 f" iter time: {(t1 - iter_t0) * 1000:.2f}ms{' optimizer.step' if not is_accumulating else ''}"
@@ -282,6 +297,7 @@ def train(fabric, state, train_loader, valid_loader, resume):
                 f" remaining time: {(t1 - total_t0) / (state['total_iter_count'] - initial_total_iter) * (max_iters - state['total_iter_count']) / 3600:.2f} hours" 
                 f" or {(t1 - total_t0) / (state['total_iter_count'] - initial_total_iter) * (max_iters - state['total_iter_count']) / 3600 / 24:.2f} days"
             )
+            """
             
             # monitor stuff
             
@@ -295,10 +311,10 @@ def train(fabric, state, train_loader, valid_loader, resume):
                              f" val f1 {val_dict['f1']}, val time: {t1 * 1000:.2f}ms")
                 fabric.log_dict(
                     {
-                        "metric/val_loss": val_dict["loss"],
-                        "metric/val_precision": val_dict["precision"],
-                        "metric/val_recall": val_dict["recall"],
-                        "metric/val_f1": val_dict["f1"],
+                        "metric/val/loss": val_dict["loss"],
+                        "metric/val/precision": val_dict["precision"],
+                        "metric/val/recall": val_dict["recall"],
+                        "metric/val/f1": val_dict["f1"],
                         "total_images": (state["total_iter_count"] + 1) * micro_batch_size * fabric.world_size
                     },
                     state["total_step_count"]
@@ -331,7 +347,7 @@ def validate(fabric: L.Fabric, model: nn.Module, valid_loader: DataLoader) -> to
         tags = rearrange(tags, "bs bl t -> (bs bl) t")
         
         outputs = model(images)
-        loss = F.binary_cross_entropy_with_logits(outputs, tags, reduction="mean")
+        loss = F.binary_cross_entropy_with_logits(outputs, tags, reduction="sum")
         losses[k] = loss.item()
         
         # convert for cuda bitwise and

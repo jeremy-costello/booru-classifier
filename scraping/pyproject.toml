@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "booru-scraping"
+version = "0.1.0"
+description = "Scraping images from boorus."
+authors = ["Your Name <you@example.com>"]
+license = "GNU GPL-3.0"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9,<3.12"
+aiofiles = "^23.0"
+aiohttp = "^3.0"
+beautifulsoup4 = "^4.0"
+dask = { version = "^2024.2.0", extras = ["dataframe", "distributed", "parquet"] }
+deeplake = "^3.8.0"
+numpy = "^1.26.0"
+pillow = "^10.0"
+tqdm = "^4.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

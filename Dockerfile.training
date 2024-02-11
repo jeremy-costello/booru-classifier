@@ -1,0 +1,30 @@
+FROM pytorch/pytorch:2.2.0-cuda12.1-cudnn8-runtime
+
+WORKDIR /booru-training
+
+RUN apt-get update && \
+    apt-get install -y curl
+
+RUN curl -sSL https://install.python-poetry.org | python3 -
+
+RUN apt-get remove -y --auto-remove curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV PATH="/root/.local/bin:$PATH"
+
+COPY /training/pyproject.toml ./
+COPY /training/poetry.lock ./
+
+RUN poetry config virtualenvs.create false && \
+    poetry install --no-interaction --no-root && \
+    rm -rf /root/.cache/pypoetry
+
+ARG TPU_TRAINING
+RUN if [ $TPU_TRAINING = "true" ] ; then \
+        pip install torch_xla[tpu]==2.2.0 -f https://storage.googleapis.com/libtpu-releases/index.html ; \
+    fi
+RUN rm -rf /root/.cache/pip
+
+COPY /training/*.py ./
+COPY data/parameters.py ./

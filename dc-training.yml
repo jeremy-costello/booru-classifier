@@ -1,0 +1,24 @@
+version: '3'
+services:
+  booru-training:
+    build:
+      context: .
+      dockerfile: Dockerfile.training
+      args:
+        - TPU_TRAINING=${TPU_TRAINING}
+    environment:
+      - WANDB_API_KEY=${WANDB_API_KEY}
+      - TPU_TRAINING=${TPU_TRAINING}
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - ${HOST_VOLUME_PATH}/data:/booru-training/data
+      - ${HOST_VOLUME_PATH}/out:/booru-training/out
+    tty: true
+    stdin_open: true

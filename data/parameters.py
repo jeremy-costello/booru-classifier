@@ -1,3 +1,6 @@
+import os
+
+
 PARAMETER_DICT = {
     "debug": True,
     "booru_url": "https://safebooru.org",
@@ -35,7 +38,6 @@ PARAMETER_DICT = {
         "matmul_precision": "high",
         "num_devices": 1,
         "precision": "bf16-mixed",
-        "tpu": False,
         "num_workers": 0,
         "global_batch_size": 64,
         "micro_batch_size": 16,
@@ -50,7 +52,8 @@ PARAMETER_DICT = {
         "beta2": 0.999,
         "grad_clip": 1.0,
         "decay_lr": True,
-        "min_lr": 3e-5
+        "min_lr": 3e-5,
+        "loss_multiplier": 256
     }
 }
 
@@ -68,5 +71,8 @@ def build_parameter_dict():
     file_root = PARAMETER_DICT["file_root"]
     for key, value in PARAMETER_DICT["files"].items():
         parameter_dict[key] = f"{file_root}/{value}"
+    
+    parameter_dict["training"]["tpu"] = \
+        True if os.environ.get("TPU_TRAINING") == "true" else False
         
     return parameter_dict

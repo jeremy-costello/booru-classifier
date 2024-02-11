@@ -1,0 +1,10 @@
+version: '3'
+services:
+  booru-scraping:
+    build:
+      context: .
+      dockerfile: Dockerfile.scraping
+    volumes:
+      - ${HOST_VOLUME_PATH}/data:/booru-scraping/data
+    tty: true
+    stdin_open: true
