@@ -154,10 +154,9 @@ def main(fabric, resume):
     
     model = fabric.setup(model)
     
-    # foreach, fused?
     optimizer = torch.optim.AdamW(model.get_optimizer_groups(weight_decay),
                                   lr=learning_rate, betas=(beta1, beta2),
-                                  fused=True, foreach=False)
+                                  foreach=False)
     optimizer = fabric.setup_optimizers(optimizer)
     
     state = {
