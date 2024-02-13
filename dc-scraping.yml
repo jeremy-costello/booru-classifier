@@ -5,6 +5,6 @@ services:
       context: .
       dockerfile: Dockerfile.scraping
     volumes:
-      - ${HOST_VOLUME_PATH}/data:/booru-scraping/data
+      - ${HOST_VOLUME_PATH}/data:/booru-scraping/mount/data
     tty: true
     stdin_open: true

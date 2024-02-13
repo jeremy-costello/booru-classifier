@@ -413,8 +413,10 @@ def create_dataloaders(batch_size: int, fabric: L.Fabric, seed: int) -> Tuple[Da
         transforms.Normalize(mean=dataset_statistics["mean"], std=dataset_statistics["std"]),
     ])
     
-    train_dataset = DeepLakeDataset(parameter_dict["deeplake_file_template"], dataset_statistics, train_transform, "train")
-    valid_dataset = DeepLakeDataset(parameter_dict["deeplake_file_template"], dataset_statistics, valid_transform, "valid")
+    train_dataset = DeepLakeDataset(parameter_dict["file_root"], parameter_dict["deeplake_file_template"],
+                                    dataset_statistics, train_transform, "train")
+    valid_dataset = DeepLakeDataset(parameter_dict["file_root"], parameter_dict["deeplake_file_template"],
+                                    dataset_statistics, valid_transform, "valid")
 
     train_sampler = BatchSampler(
         DistributedSampler(

@@ -18,7 +18,7 @@ services:
               count: 1
               capabilities: [gpu]
     volumes:
-      - ${HOST_VOLUME_PATH}/data:/booru-training/data
-      - ${HOST_VOLUME_PATH}/out:/booru-training/out
+      - ${HOST_VOLUME_PATH}/data:/booru-training/mount/data
+      - ${HOST_VOLUME_PATH}/out:/booru-training/mount/out
     tty: true
     stdin_open: true

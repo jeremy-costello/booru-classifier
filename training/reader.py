@@ -14,6 +14,7 @@ from params.parameters import build_parameter_dict
 def main():
     parameter_dict = build_parameter_dict()
 
+    file_root = parameter_dict["file_root"]
     deeplake_file_template = parameter_dict["deeplake_file_template"]
     matmul_precision = parameter_dict["training"]["matmul_precision"]
     num_workers = parameter_dict["training"]["num_workers"]
@@ -36,7 +37,7 @@ def main():
     fabric = L.Fabric(accelerator="cuda", devices=1, strategy="fsdp")
     fabric.launch()
     
-    train_dataset = DeepLakeDataset(deeplake_file_template, dataset_statistics, transform, split="train")
+    train_dataset = DeepLakeDataset(file_root, deeplake_file_template, dataset_statistics, transform, split="train")
 
     train_sampler = BatchSampler(
         DistributedSampler(
@@ -81,8 +82,8 @@ def main():
 
 
 class DeepLakeDataset(Dataset):    
-    def __init__(self, deeplake_file_template, dataset_statistics, transform, split):
-        lake_path = deeplake_file_template.format(root="data", split=split)
+    def __init__(self, file_root, deeplake_file_template, dataset_statistics, transform, split):
+        lake_path = deeplake_file_template.format(root=file_root, split=split)
         self.lake = deeplake.dataset(lake_path, read_only=True)
         
         self.total_samples = dataset_statistics["count"][split]

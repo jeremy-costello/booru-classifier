@@ -64,6 +64,7 @@ def build_parameter_dict():
     parameter_dict = {
         "debug": PARAMETER_DICT["debug"],
         "booru_url": PARAMETER_DICT["booru_url"],
+        "file_root": PARAMETER_DICT["file_root"],
         "deeplake_file_template": PARAMETER_DICT["deeplake_file_template"],
         "scraping": PARAMETER_DICT["scraping"],
         "dataset": PARAMETER_DICT["dataset"],
