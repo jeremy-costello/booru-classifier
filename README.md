@@ -23,7 +23,7 @@ Download tagged images from any booru with similar structure to [safebooru](http
   - input ```TPU_TRAINING```. set to "true" if training with TPU. hasn't been tested.
 - run the docker compose with ```docker-compose -f dc-training.yml up``` (may need ```sudo```)
 - attach to the docker compose with ```docker-compose -f dc-training.yml exec booru-training /bin/bash``` (may need ```sudo``` and/or ```-u root```)
-- run mv parameters.py ./params to move the parameters file onto the persistent volume. can edit this file if required
+- run ```mv parameters.py ./params``` to move the parameters file onto the persistent volume. can edit this file if required
 - run ```reader.py``` to test the pytorch dataset is working (saves a sample on the persistent volume as ```plotted_images.png```)
 - run ```trainer.py```to train a model
 
