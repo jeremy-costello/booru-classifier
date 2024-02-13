@@ -38,7 +38,7 @@ Download tagged images from any booru with similar structure to [safebooru](http
 - run ```wget https://raw.githubusercontent.com/jeremy-costello/booru-classifier/main/aws_setup.sh```
 - run ```chmod +x aws_setup.sh```
 - run ```wget https://raw.githubusercontent.com/jeremy-costello/booru-classifier/main/.env.example```
-- run ```mv .env.example``` ```.env```
+- run ```mv .env.example .env```
   - input ```WANDB_API_KEY```. this is your [Weights & Biases](https://wandb.ai/site) api key.
   - input ```TPU_TRAINING```. set to "true" if training with TPU. hasn't been tested.
   - input ```BUCKET_NAME```. this is the name of the S3 bucket your scraping data is in.
