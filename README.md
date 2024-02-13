@@ -43,6 +43,7 @@ Download tagged images from any booru with similar structure to [safebooru](http
   - input ```TPU_TRAINING```. set to "true" if training with TPU. hasn't been tested.
   - input ```BUCKET_NAME```. this is the name of the S3 bucket your scraping data is in.
 - run ```./aws_setup.sh```
+- run ```cd training```
 - edit parameters in ```params/parameters.py``` (e.g. using vim)
 - run ```python trainer.py```
 
