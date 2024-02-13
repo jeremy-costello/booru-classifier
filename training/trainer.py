@@ -24,7 +24,7 @@ from transformers.models.convnextv2.modeling_convnextv2 import ConvNextV2Layer
 from reader import DeepLakeDataset
 from params.parameters import build_parameter_dict
 from model import ConvNextV2ForMultiLabelClassification
-from utils import get_default_supported_precision, num_parameters, step_csv_logger
+from utils import get_default_supported_precision, num_parameters
 
 # https://docs.aws.amazon.com/sagemaker/latest/dg/data-parallel-modify-sdp-pt-lightning.html
 sagemaker_training = False
@@ -55,7 +55,8 @@ else:
 
 model_name = parameter_dict["training"]["model_name"]
 name = parameter_dict["training"]["name"]
-out_dir = Path("out") / name
+out_root = parameter_dict["training"]["out_root"]
+out_dir = Path(out_root) / name
 
 matmul_precision = parameter_dict["training"]["matmul_precision"]
 num_devices = parameter_dict["training"]["num_devices"]
@@ -104,7 +105,6 @@ lr_decay_iters = max_iters
 log_iter_interval = log_step_interval * gradient_accumulation_steps
 
 hparams = {k: v for k, v in locals().items() if isinstance(v, (int, float, str)) and not k.startswith("_")}
-logger = step_csv_logger("out", name, flush_logs_every_n_steps=log_iter_interval)
 wandb_logger = WandbLogger()
 
 
@@ -137,7 +137,7 @@ def setup(
         devices=devices,
         num_nodes=num_nodes,
         precision=precision,
-        loggers=[logger, wandb_logger]
+        loggers=[wandb_logger]
     )
     fabric.print(hparams)
     main(fabric, resume)

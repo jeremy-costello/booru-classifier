@@ -4,7 +4,7 @@ import os
 PARAMETER_DICT = {
     "debug": True,
     "booru_url": "https://safebooru.org",
-    "file_root": "./data",
+    "file_root": "./mount/data",
     "deeplake_file_template": "{root}/{split}_lake",
     "files": {
         "database_file": "booru.db",
@@ -32,6 +32,7 @@ PARAMETER_DICT = {
         "stats_rounding": 4,
     },
     "training": {
+        "out_root": "./mount/out",
         "seed": None,
         "model_name": None,
         "name": None,

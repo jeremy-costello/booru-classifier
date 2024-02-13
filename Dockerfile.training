@@ -8,13 +8,15 @@ SHELL ["/bin/micromamba", "run", "-n", "base", "/bin/bash", "-c"]
 
 RUN micromamba install -f conda-lock.yml -y && \
     micromamba clean --all --yes && \
+    rm -rf ~/.cache/mamba && \
     rm conda-lock.yml
 
 ARG TPU_TRAINING
 RUN python -m pip install deeplake==3.8.* && \
     if [ $TPU_TRAINING = "true" ] ; then \
         pip install torch_xla[tpu]==2.2.0 -f https://storage.googleapis.com/libtpu-releases/index.html ; \
-    fi
+    fi && \
+    rm -rf ~/.cache/pip
 
 COPY *.py ./
 COPY /params/parameters.py ./
