@@ -6,7 +6,7 @@ import itertools
 from bs4 import BeautifulSoup
 from tqdm.asyncio import tqdm, tqdm_asyncio
 
-from data.parameters import build_parameter_dict
+from params.parameters import build_parameter_dict
 
 
 parameter_dict = build_parameter_dict()

@@ -9,7 +9,7 @@ from contextlib import nullcontext
 from dask.diagnostics import ProgressBar
 from PIL import Image, UnidentifiedImageError
 
-from data.parameters import build_parameter_dict
+from params.parameters import build_parameter_dict
 
 
 parameter_dict = build_parameter_dict()

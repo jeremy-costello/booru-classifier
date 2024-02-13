@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 from tqdm.asyncio import tqdm, tqdm_asyncio
 
-from data.parameters import build_parameter_dict
+from params.parameters import build_parameter_dict
 
 
 YEAR_CUTOFF = 2024

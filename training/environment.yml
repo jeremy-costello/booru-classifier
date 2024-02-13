@@ -1,0 +1,21 @@
+# environment.yml
+channels:
+  - nvidia
+  - pytorch
+  - conda-forge
+dependencies:
+  - python>=3.9,<3.12
+  # deeplake=3.8 (pip)
+  - einops=0.7
+  - jsonargparse=4
+  - lightning=2.2
+  - matplotlib=3
+  - pip=23
+  - pytorch=2.2
+  - pytorch-cuda=12.1
+  - torchvision=0.17
+  - tqdm=4
+  - transformers=4.37
+  - wandb=0.16
+platforms:
+  - linux-64

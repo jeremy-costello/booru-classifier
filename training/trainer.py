@@ -22,9 +22,26 @@ from torch.utils.data import DataLoader, BatchSampler, DistributedSampler
 from transformers.models.convnextv2.modeling_convnextv2 import ConvNextV2Layer
 
 from reader import DeepLakeDataset
-from data.parameters import build_parameter_dict
+from params.parameters import build_parameter_dict
 from model import ConvNextV2ForMultiLabelClassification
 from utils import get_default_supported_precision, num_parameters, step_csv_logger
+
+# https://docs.aws.amazon.com/sagemaker/latest/dg/data-parallel-modify-sdp-pt-lightning.html
+sagemaker_training = False
+if sagemaker_training:
+    import os
+    import smdistributed.dataparallel.torch.torch_smddp
+    from lightning.fabric.plugins.environments.lightning import LightningEnvironment
+    
+    cluster_environment = LightningEnvironment()
+    cluster_environment.world_size = lambda: int(os.environ["WORLD_SIZE"])
+    cluster_environment.global_rank = lambda: int(os.environ["RANK"])
+    
+    # accelerator = gpu ???
+    process_group_backend = "smddp"
+else:
+    cluster_environment = None
+    process_group_backend = None
 
 
 parameter_dict = build_parameter_dict()
@@ -42,6 +59,7 @@ out_dir = Path("out") / name
 
 matmul_precision = parameter_dict["training"]["matmul_precision"]
 num_devices = parameter_dict["training"]["num_devices"]
+num_nodes = parameter_dict["training"]["num_nodes"]
 precision_maybe = parameter_dict["training"]["precision"]
 tpu = parameter_dict["training"]["tpu"]
 num_workers = parameter_dict["training"]["num_workers"]
@@ -102,6 +120,8 @@ def setup(
             strategy = XLAStrategy(sync_module_states=False)
         else:
             strategy = FSDPStrategy(
+                cluster_environment=cluster_environment,
+                process_group_backend=process_group_backend,
                 auto_wrap_policy={ConvNextV2Layer},
                 activation_checkpointing_policy=None,
                 state_dict_type="full",
@@ -111,7 +131,14 @@ def setup(
     else:
         strategy = "auto"
     
-    fabric = L.Fabric(devices=devices, strategy=strategy, precision=precision, loggers=[logger, wandb_logger])
+    # add num_nodes
+    fabric = L.Fabric(
+        strategy=strategy,
+        devices=devices,
+        num_nodes=num_nodes,
+        precision=precision,
+        loggers=[logger, wandb_logger]
+    )
     fabric.print(hparams)
     main(fabric, resume)
 

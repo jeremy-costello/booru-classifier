@@ -36,6 +36,7 @@ PARAMETER_DICT = {
         "model_name": None,
         "name": None,
         "matmul_precision": "high",
+        "num_nodes": 1,
         "num_devices": 1,
         "precision": "bf16-mixed",
         "num_workers": 0,
@@ -73,6 +74,6 @@ def build_parameter_dict():
         parameter_dict[key] = f"{file_root}/{value}"
     
     parameter_dict["training"]["tpu"] = \
-        True if os.environ.get("TPU_TRAINING") == "true" else False
+        True if os.environ["TPU_TRAINING"] == "true" else False
         
     return parameter_dict

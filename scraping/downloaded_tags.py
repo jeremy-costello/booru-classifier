@@ -2,7 +2,7 @@ import math
 import sqlite3
 from tqdm import tqdm
 
-from data.parameters import build_parameter_dict
+from params.parameters import build_parameter_dict
 
 
 parameter_dict = build_parameter_dict()

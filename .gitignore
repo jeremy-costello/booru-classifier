@@ -170,7 +170,5 @@ poetry/
 final_processing.py
 speed_monitor.py
 ts_test.py
-conda-lock.yml
-environment.yml
 *.ipynb
 *.txt

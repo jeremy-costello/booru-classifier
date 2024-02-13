@@ -21,4 +21,4 @@ RUN poetry config virtualenvs.create false && \
     rm -rf /root/.cache/pypoetry
 
 COPY /scraping/*.py ./
-COPY data/parameters.py ./
+COPY /params/parameters.py ./

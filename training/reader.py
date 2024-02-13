@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import torchvision.transforms.v2 as transforms
 from torch.utils.data import Dataset, DataLoader, BatchSampler, DistributedSampler
 
-from data.parameters import build_parameter_dict
+from params.parameters import build_parameter_dict
 
 
 def main():

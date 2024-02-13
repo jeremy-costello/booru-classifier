@@ -6,7 +6,7 @@ import pandas as pd
 from tqdm import tqdm
 import dask.dataframe as dd
 
-from data.parameters import build_parameter_dict
+from params.parameters import build_parameter_dict
 
 
 LIMITED_TYPES = ["artist", "copyright", "model"]

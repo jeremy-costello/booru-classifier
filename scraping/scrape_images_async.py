@@ -8,7 +8,7 @@ import itertools
 from pathlib import Path
 from tqdm.asyncio import tqdm, tqdm_asyncio
 
-from data.parameters import build_parameter_dict
+from params.parameters import build_parameter_dict
 
 
 GOOD_EXTENSIONS = ["jpeg", "jpg", "png"]
