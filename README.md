@@ -33,6 +33,7 @@ Download tagged images from any booru with similar structure to [safebooru](http
 
 ### training
 - attach to an EC2 instance
+  - make sure it has an IAM role with the ```AmazonS3FullAccess``` permission.
 - run ```wget https://raw.githubusercontent.com/jeremy-costello/booru-classifier/main/aws_setup.sh```
 - run ```chmod +x aws_setup.sh```
 - run ```wget https://raw.githubusercontent.com/jeremy-costello/booru-classifier/main/.env.example```
