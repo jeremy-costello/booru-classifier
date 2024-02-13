@@ -42,13 +42,7 @@ Download tagged images from any booru with similar structure to [safebooru](http
   - input ```WANDB_API_KEY```. this is your [Weights & Biases](https://wandb.ai/site) api key.
   - input ```TPU_TRAINING```. set to "true" if training with TPU. hasn't been tested.
   - input ```BUCKET_NAME```. this is the name of the S3 bucket your scraping data is in.
-- run ```./aws_setup.sh```
-- activate micromamba
-  - run ```cd ~```
-  - run ```eval "$(./bin/micromamba shell hook -s posix)"```
-  - run ```./bin/micromamba shell init -s bash -p ~/micromamba```
-  - run ```micromamba activate training``` to activate the micromamba environment created by ```aws_setup.sh```
-- run ```cd training``` to enter the training directory created by ```aws_setup.sh```
+- run ```. aws_setup.sh```
 - edit parameters in ```params/parameters.py``` (e.g. using vim)
 - run ```python trainer.py```
 
