@@ -22,7 +22,6 @@ micromamba install -f conda-lock.yml -y
 python -m pip install deeplake==3.8.*
 cp *.py ~/training
 cp -r ../params ~/training
-cp ../.env ~/training
 cd ~/training
 mkdir mount
 mount-s3 $BUCKET_NAME mount

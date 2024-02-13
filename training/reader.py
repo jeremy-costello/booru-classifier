@@ -76,7 +76,7 @@ def main():
             axes[i].axis("off")
             axes[i].set_title(f"Image {i+1}")
 
-        plt.savefig("./data/plotted_images.png")
+        plt.savefig(f"{file_root}/plotted_images.png")
         plt.close()
         break
 

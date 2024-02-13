@@ -18,6 +18,7 @@ services:
               count: 1
               capabilities: [gpu]
     volumes:
+      - ${HOST_VOLUME_PATH}/data:/booru-scraping/params
       - ${HOST_VOLUME_PATH}/data:/booru-training/mount/data
       - ${HOST_VOLUME_PATH}/out:/booru-training/mount/out
     tty: true
