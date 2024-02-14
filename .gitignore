@@ -163,6 +163,7 @@ cython_debug/
 data/*
 !data/parameters.py
 .docker/
+aws/
 bazel/
 backup/
 deeplake/

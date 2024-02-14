@@ -8,7 +8,6 @@ import torch
 import random
 from torch import nn
 import lightning as L
-from tqdm import tqdm
 from pathlib import Path
 from einops import rearrange
 import torch.nn.functional as F
@@ -25,6 +24,10 @@ from reader import DeepLakeDataset
 from params.parameters import build_parameter_dict
 from model import ConvNextV2ForMultiLabelClassification
 from utils import get_default_supported_precision, num_parameters
+
+use_tqdm = True
+if use_tqdm:
+    from tqdm import tqdm
 
 # https://docs.aws.amazon.com/sagemaker/latest/dg/data-parallel-modify-sdp-pt-lightning.html
 sagemaker_training = False
@@ -66,6 +69,7 @@ tpu = parameter_dict["training"]["tpu"]
 num_workers = parameter_dict["training"]["num_workers"]
 global_batch_size = parameter_dict["training"]["global_batch_size"]
 micro_batch_size = parameter_dict["training"]["micro_batch_size"]
+nano_batch_size = parameter_dict["training"]["nano_batch_size"]
 num_epochs = parameter_dict["training"]["num_epochs"]
 warmup_steps = parameter_dict["training"]["warmup_steps"]
 log_step_interval = parameter_dict["training"]["log_step_interval"]
@@ -85,6 +89,10 @@ batch_size = global_batch_size // num_devices
 gradient_accumulation_steps = batch_size // micro_batch_size
 assert gradient_accumulation_steps > 0
 warmup_iters = warmup_steps * gradient_accumulation_steps
+
+assert micro_batch_size % nano_batch_size == 0
+outer_batch_size = micro_batch_size // nano_batch_size
+inner_batch_size = nano_batch_size
 
 with open(parameter_dict["dataset_statistics_json"], 'r') as f:
     dataset_statistics = json.load(f)
@@ -131,7 +139,6 @@ def setup(
     else:
         strategy = "auto"
     
-    # add num_nodes
     fabric = L.Fabric(
         strategy=strategy,
         devices=devices,
@@ -155,7 +162,8 @@ def main(fabric, resume):
     config = ConvNextV2Config()
     
     train_loader, valid_loader = create_dataloaders(
-        batch_size=micro_batch_size,
+        outer_batch_size=outer_batch_size,
+        inner_batch_size=inner_batch_size,
         fabric=fabric,
         seed=seed
     )
@@ -179,7 +187,9 @@ def main(fabric, resume):
     fabric.print(f"Time to instantiate model: {(time.perf_counter() - t0):.2f} seconds")
     fabric.print(f"Total parameters {num_parameters(model):,}")
     
-    model = fabric.setup(model)
+    # https://lightning.ai/docs/fabric/stable/advanced/compile.html
+    model = torch.compile(model, mode="reduce-overhead")
+    model = fabric.setup(model, _reapply_compile=True)
     
     optimizer = torch.optim.AdamW(model.get_optimizer_groups(weight_decay),
                                   lr=learning_rate, betas=(beta1, beta2),
@@ -198,6 +208,7 @@ def main(fabric, resume):
     }
     
     if resume:
+        resumed = True
         if isinstance(resume, Path):
             resume_pth = resume
         elif isinstance(resume, bool):
@@ -205,12 +216,15 @@ def main(fabric, resume):
             if pth_glob:
                 resume_pth = pth_glob[-1]
             else:
-                raise ValueError("resume set to True, but no *.pth files found")
+                resumed = False
         else:
             raise ValueError("Invalid type for resume. Should be bool or Path")
         
-        fabric.print(f"Resuming training from {resume_pth}")
-        fabric.load(resume_pth, state)
+        if resumed:
+            fabric.print(f"Resuming training from {resume_pth}")
+            fabric.load(resume_pth, state)
+        else:
+            fabric.print("Could not find file to resume from. Starting new training run.")
     
     if seed != state["hparams"]["seed"]:
         raise ValueError(f"seed in hyperparameters.py ({seed_maybe}) should be the same as"
@@ -252,17 +266,21 @@ def train(fabric, state, train_loader, valid_loader, resume):
         fabric.print("Total iterations >= maximum iterations")
         return
 
-    # tqdm only on rank 0
-    average_train_loss = 0
-    for epoch in tqdm(range(num_epochs)):
-        if resume:
-            if epoch < initial_epoch:
-                continue
-        else:
+    average_train_loss = torch.zeros(1).to(fabric.device)
+    if fabric.global_rank == 0 and use_tqdm:
+        outer_pbar = tqdm(range(num_epochs))
+    
+    for epoch in range(num_epochs):
+        if not resume:
             assert epoch == state["epoch_count"]
-        for train_batch in tqdm(train_loader, leave=False):
+        if fabric.global_rank == 0 and use_tqdm:
+            inner_pbar = tqdm(range(len(train_loader)), leave=False)
+        
+        for train_batch in train_loader:
             if resume:
-                if curr_epoch_iter < initial_epoch_iter:
+                if epoch < initial_epoch:
+                    continue
+                elif curr_epoch_iter < initial_epoch_iter:
                     curr_epoch_iter += 1
                     continue
                 else:
@@ -272,15 +290,8 @@ def train(fabric, state, train_loader, valid_loader, resume):
                     fabric.print(f"Resume finished. Took {time.perf_counter() - total_t0} seconds")
 
             if state["total_iter_count"] >= max_iters:
-                break
-
-            # only need to get LR on gradient accumulation steps?
-            lr = get_lr(state["total_iter_count"]) if decay_lr else learning_rate
-            for param_group in optimizer.param_groups:
-                param_group["lr"] = lr
-            
-            iter_t0 = time.perf_counter()
-            
+                break            
+                        
             images = train_batch["images"]
             images = rearrange(images, "bs bl c h w -> (bs bl) c h w")
             tags = train_batch["tags"]
@@ -294,64 +305,68 @@ def train(fabric, state, train_loader, valid_loader, resume):
                 average_train_loss += loss / gradient_accumulation_steps
             
             if not is_accumulating:
+                lr = get_lr(state["total_iter_count"]) if decay_lr else learning_rate
+                for param_group in optimizer.param_groups:
+                    param_group["lr"] = lr
+                
                 fabric.clip_gradients(model, optimizer, max_norm=grad_clip)
                 optimizer.step()
                 optimizer.zero_grad()
                 state["epoch_step_count"] += 1
                 state["total_step_count"] += 1
                 
-                fabric.log_dict(
-                    {
-                        "metric/train/loss": average_train_loss
-                    },
-                    state["total_step_count"]
-                )
+                with torch.no_grad():
+                    average_train_loss = fabric.all_reduce(average_train_loss, reduce_op="sum")
+                if fabric.global_rank == 0:
+                    fabric.log_dict(
+                        {
+                            "metric/train/loss": average_train_loss
+                        },
+                        state["total_step_count"]
+                    )
                 average_train_loss = 0
-            # idk how this works
+            # idk how tpu training works
             elif fabric.device.type == "xla":
                 xm.mark_step()
             
             state["epoch_iter_count"] += 1
             state["total_iter_count"] += 1
-            t1 = time.perf_counter()
-            
-            """
-            fabric.print(
-                f"epoch {state['epoch_count']}: iter {state['epoch_iter_count']}, step {state['epoch_step_count']}: loss {loss.item():.4f},"
-                f" iter time: {(t1 - iter_t0) * 1000:.2f}ms{' optimizer.step' if not is_accumulating else ''}"
-                f" total iters: {state['total_iter_count']}, total steps: {state['total_step_count']}"
-                f" remaining time: {(t1 - total_t0) / (state['total_iter_count'] - initial_total_iter) * (max_iters - state['total_iter_count']) / 3600:.2f} hours" 
-                f" or {(t1 - total_t0) / (state['total_iter_count'] - initial_total_iter) * (max_iters - state['total_iter_count']) / 3600 / 24:.2f} days"
-            )
-            """
             
             # monitor stuff
-            
             if not is_accumulating and state["total_step_count"] % eval_step_interval == 0:
-                t0 = time.perf_counter()
                 val_dict = validate(fabric, model, valid_loader)
-                t1 = time.perf_counter() - t0
                 # monitor stuff
-                fabric.print(f"step {state['total_step_count']}: val loss {val_dict['loss']:.4f},"
-                             f" val precision {val_dict['precision']:.4f}, val recall {val_dict['recall']},"
-                             f" val f1 {val_dict['f1']}, val time: {t1 * 1000:.2f}ms")
-                fabric.log_dict(
-                    {
-                        "metric/val/loss": val_dict["loss"],
-                        "metric/val/precision": val_dict["precision"],
-                        "metric/val/recall": val_dict["recall"],
-                        "metric/val/f1": val_dict["f1"],
-                        "total_images": (state["total_iter_count"] + 1) * micro_batch_size * fabric.world_size
-                    },
-                    state["total_step_count"]
-                )
+                with torch.no_grad():
+                    val_dict = fabric.all_reduce(val_dict, reduce_op="mean")
+                if fabric.global_rank == 0:
+                    fabric.log_dict(
+                        {
+                            "metric/val/loss": val_dict["loss"],
+                            "metric/val/precision": val_dict["precision"],
+                            "metric/val/recall": val_dict["recall"],
+                            "metric/val/f1": val_dict["f1"],
+                            "total_images": (state["total_iter_count"] + 1) * micro_batch_size * fabric.world_size
+                        },
+                        state["total_step_count"]
+                    )
                 fabric.barrier()
             if not is_accumulating and state["total_step_count"] % save_step_interval == 0:
                 checkpoint_path = out_dir / f"iter-{state['total_iter_count']:06d}-ckpt.pth"
                 fabric.print(f"Saving checkpoint to {str(checkpoint_path)!r}")
                 fabric.save(checkpoint_path, state)
+            
+            if fabric.global_rank == 0:
+                inner_pbar.update(1)
+        
+        if fabric.global_rank == 0:
+            inner_pbar.close()
         
         state["epoch_count"] += 1
+        if fabric.global_rank == 0:
+            outer_pbar.update(1)
+    
+    if fabric.global_rank == 0:
+        outer_pbar.close()
 
 
 @torch.no_grad()
@@ -360,13 +375,18 @@ def validate(fabric: L.Fabric, model: nn.Module, valid_loader: DataLoader) -> to
     model.eval()
 
     # does this require fabric.world_size? or is that done automatically
+    # https://lightning.ai/docs/fabric/stable/advanced/distributed_communication.html
     valid_batches = count_valid // (fabric.world_size * micro_batch_size)
+        
     losses = torch.zeros(valid_batches, device=fabric.device)
     tp = torch.zeros(vocab_size, device=fabric.device)
     fp = torch.zeros(vocab_size, device=fabric.device)
     fn = torch.zeros(vocab_size, device=fabric.device)
-    # tqdm only on rank 0
-    for k, valid_batch in enumerate(tqdm(valid_loader, leave=False)):
+    
+    if fabric.global_rank == 0 and use_tqdm:
+        inner_pbar = tqdm(range(len(valid_loader)), leave=False)
+    
+    for k, valid_batch in enumerate(valid_loader):
         images = valid_batch["images"]
         images = rearrange(images, "bs bl c h w -> (bs bl) c h w")
         tags = valid_batch["tags"]
@@ -384,6 +404,12 @@ def validate(fabric: L.Fabric, model: nn.Module, valid_loader: DataLoader) -> to
         tp += (predicted & tags).sum(dim=0)
         fp += (predicted & ~tags).sum(dim=0)
         fn += (~predicted & tags).sum(dim=0)
+        
+        if fabric.global_rank == 0:
+            inner_pbar.update(1)
+    
+    if fabric.global_rank == 0:
+        inner_pbar.close()
 
     epsilon = 1e-12
     precision = tp / (tp + fp + epsilon)
@@ -393,14 +419,14 @@ def validate(fabric: L.Fabric, model: nn.Module, valid_loader: DataLoader) -> to
     model.train()
     # probably something better than mean for precision, recall, f1?
     return {
-        "loss": losses.mean().item(),
-        "precision": precision.mean().item(),
-        "recall": recall.mean().item(),
-        "f1": f1.mean().item()
+        "loss": losses.mean(),
+        "precision": precision.mean(),
+        "recall": recall.mean(),
+        "f1": f1.mean()
     }
 
 
-def create_dataloaders(batch_size: int, fabric: L.Fabric, seed: int) -> Tuple[DataLoader, DataLoader]:
+def create_dataloaders(outer_batch_size: int, inner_batch_size: int, fabric: L.Fabric, seed: int) -> Tuple[DataLoader, DataLoader]:
     train_transform = transforms.Compose([
         transforms.RandomHorizontalFlip(),
         transforms.TrivialAugmentWide(),
@@ -426,7 +452,7 @@ def create_dataloaders(batch_size: int, fabric: L.Fabric, seed: int) -> Tuple[Da
             shuffle=True,
             seed=seed,
             drop_last=True),
-        batch_size=batch_size,
+        batch_size=inner_batch_size,
         drop_last=True)
     
     valid_sampler = BatchSampler(
@@ -436,12 +462,12 @@ def create_dataloaders(batch_size: int, fabric: L.Fabric, seed: int) -> Tuple[Da
             rank=fabric.global_rank,
             shuffle=False,
             drop_last=True),
-        batch_size=batch_size,
+        batch_size=inner_batch_size,
         drop_last=True)
 
     train_loader = DataLoader(
         train_dataset,
-        batch_size=1,
+        batch_size=outer_batch_size,
         sampler=train_sampler,
         num_workers=num_workers,
         pin_memory=True,
@@ -450,7 +476,7 @@ def create_dataloaders(batch_size: int, fabric: L.Fabric, seed: int) -> Tuple[Da
 
     valid_loader = DataLoader(
         valid_dataset,
-        batch_size=1,
+        batch_size=outer_batch_size,
         sampler=valid_sampler,
         num_workers=num_workers,
         pin_memory=True,

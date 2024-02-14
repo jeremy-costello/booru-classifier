@@ -18,7 +18,7 @@ COPY /scraping/poetry.lock ./
 
 RUN poetry config virtualenvs.create false && \
     poetry install --no-interaction --no-root && \
-    rm -rf /root/.cache/pypoetry
+    rm -rf ~/.cache/pypoetry
 
 COPY /scraping/*.py ./
 COPY /params/parameters.py ./
