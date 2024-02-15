@@ -48,3 +48,10 @@ Download tagged images from any booru with similar structure to [safebooru](http
 
 # todo
 - train a model
+
+# training logs
+- batch size=4096, lr=3e-4, warmup steps=2000
+  - compiling the model resulted in a ~2x training speed increase
+  - moving data from my HDD to my SSD resulted in a ~6x training speed increase
+  - i think i'm being bottlenecked slightly by my CPU
+  - 
