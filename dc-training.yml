@@ -19,7 +19,7 @@ services:
               capabilities: [gpu]
     volumes:
       - ${HOST_VOLUME_PATH}/params:/booru-training/params
-      - ${HOST_VOLUME_PATH}/data:/booru-training/mount/data
-      - ${HOST_VOLUME_PATH}/out:/booru-training/mount/out
+      - ${HOST_VOLUME_PATH}/mount/data:/booru-training/mount/data
+      - ${HOST_VOLUME_PATH}/mount/out:/booru-training/mount/out
     tty: true
     stdin_open: true
